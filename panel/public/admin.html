@@ -370,7 +370,7 @@
               <div class="stat-label">公告</div>
             </div>
           </div>
-          <div class="card">
+          <div class="card" style="margin-bottom: 24px;">
             <div class="card-header">
               <h3>最新版本</h3>
               <button class="btn btn-sm" onclick="showPage('versions')">查看全部</button>
@@ -378,6 +378,16 @@
             <table>
               <thead><tr><th>版本</th><th>日期</th><th>状态</th></tr></thead>
               <tbody id="dashboardVersionList"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>最新公告</h3>
+              <button class="btn btn-sm" onclick="showPage('announcements')">查看全部</button>
+            </div>
+            <table>
+              <thead><tr><th>标题</th><th>内容</th><th>时间</th></tr></thead>
+              <tbody id="dashboardAnnouncementList"></tbody>
             </table>
           </div>
         </div>
@@ -415,12 +425,12 @@
             <div class="card-body">
               <div class="form-item">
                 <label class="form-label">GitHub 仓库</label>
-                <input type="text" id="settingGithubRepo" class="form-input" placeholder="owner/repo">
+                <input type="text" id="settingGithubRepo" class="form-input" placeholder="owner/repo" autocomplete="off">
                 <div class="form-hint">每小时自动同步 Release</div>
               </div>
               <div class="form-item">
                 <label class="form-label">GitHub Token</label>
-                <input type="password" id="settingGithubToken" class="form-input" placeholder="ghp_xxxx">
+                <input type="password" id="settingGithubToken" class="form-input" placeholder="ghp_xxxx" autocomplete="off">
                 <div class="form-hint">可选，用于提高 API 速率限制</div>
               </div>
               <button class="btn btn-primary" onclick="saveSettings()">保存</button>
@@ -556,12 +566,18 @@
         tbody.innerHTML = versions.slice(0, 5).map(v =>
           '<tr><td><code style="background:#f5f5f5;padding:2px 6px;border-radius:3px;">' + v.version + '</code></td><td>' + v.date + '</td><td><span class="badge ' + (v.enabled ? 'badge-success' : 'badge-default') + '">' + (v.enabled ? '已推送' : '未推送') + '</span></td></tr>'
         ).join('') || '<tr><td colspan="3" class="empty">暂无数据</td></tr>';
+
+        const annTbody = document.getElementById('dashboardAnnouncementList');
+        annTbody.innerHTML = announcements.slice(0, 3).map(a =>
+          '<tr><td>' + escapeHtml(a.title) + '</td><td>' + escapeHtml(a.content) + '</td><td>' + a.created_at + '</td></tr>'
+        ).join('') || '<tr><td colspan="3" class="empty">暂无公告</td></tr>';
       } catch (e) {
         console.error('Load dashboard failed:', e);
         document.getElementById('statVersions').textContent = '-';
         document.getElementById('statEnabled').textContent = '-';
         document.getElementById('statAnnouncements').textContent = '-';
         document.getElementById('dashboardVersionList').innerHTML = '<tr><td colspan="3" class="empty">加载失败</td></tr>';
+        document.getElementById('dashboardAnnouncementList').innerHTML = '<tr><td colspan="3" class="empty">加载失败</td></tr>';
       }
     }
 

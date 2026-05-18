@@ -44,6 +44,10 @@ export async function syncGitHubReleases(env: Env): Promise<{ success: boolean; 
       if (!version.startsWith('v')) continue;
 
       version = version.substring(1);
+
+      // 跳过非正式版本（alpha、beta、rc、pre 等）
+      const prereleasePattern = /-(alpha|beta|rc|pre|dev|snapshot|nightly)(\.\d+)?$/i;
+      if (prereleasePattern.test(version)) continue;
       const date = release.published_at.split('T')[0];
       const changes = parseReleaseBody(release.body || '');
 
