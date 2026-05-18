@@ -705,6 +705,16 @@ const renderCalendarChart = () => {
   // 获取今天的日期字符串
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
+  const isToday = (date: string) => date === todayStr;
+  const isCurrentYear = selectedYear.value === today.getFullYear();
+
+  const heatmapData = () => {
+    const data = chartData.map(item => [item.date, item.count]);
+    if (isCurrentYear && !chartData.some(item => isToday(item.date))) {
+      data.push([todayStr as string, 0]);
+    }
+    return data;
+  };
 
   const option = {
     tooltip: {
@@ -741,19 +751,7 @@ const renderCalendarChart = () => {
       {
         type: 'heatmap',
         coordinateSystem: 'calendar',
-        data: chartData.map(item => [item.date, item.count]),
-      },
-      // 添加今天的标记
-      {
-        type: 'scatter',
-        coordinateSystem: 'calendar',
-        data: [[todayStr, 0]],
-        symbol: 'rect',
-        symbolSize: 14,
-        itemStyle: {
-          color: 'rgba(245, 108, 108, 0.3)',
-        },
-        zlevel: 1,
+        data: heatmapData(),
       },
     ],
   };
