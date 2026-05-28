@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { login, register, forgotPassword, resetPassword } from '@/composables/api/user';
 import { setAccessToken } from '@/utils/auth';
+import { useUser } from '@/composables/useUser';
+import { get } from '@/utils/request';
+import type { ApiResponse } from '@@/types/request';
 
 defineProps<{
   modelValue: boolean;
@@ -14,6 +17,7 @@ const emit = defineEmits<{
 const mode = ref<'login' | 'register' | 'forgot'>('login');
 
 const { oauthConfig } = useSysConfig();
+const { fetchUserInfo } = useUser();
 const route = useRoute();
 const config = useRuntimeConfig();
 
@@ -29,6 +33,88 @@ const getOAuthUrl = (provider: string) => {
 const handleOAuthClick = (provider: string) => {
   oauthLoading.value = provider;
   window.location.href = getOAuthUrl(provider);
+};
+
+// 微信扫码登录
+const wechatQR = ref<{
+  visible: boolean;
+  imageUrl: string;
+  scene: string;
+  status: string;
+  error: string;
+}>({
+  visible: false,
+  imageUrl: '',
+  scene: '',
+  status: '',
+  error: '',
+});
+let wechatPollTimer: ReturnType<typeof setInterval> | null = null;
+
+const clearWechatPoll = () => {
+  if (wechatPollTimer) {
+    clearInterval(wechatPollTimer);
+    wechatPollTimer = null;
+  }
+};
+
+const showWechatQR = async () => {
+  wechatQR.value = { visible: true, imageUrl: '', scene: '', status: 'loading', error: '' };
+  try {
+    const resp = await $fetch.raw(`${config.public.apiUrl}/auth/wechat/qrcode`, {
+      responseType: 'blob',
+    });
+    const blob = resp._data as Blob;
+    const scene = resp.headers.get('X-Scene') || '';
+    wechatQR.value.imageUrl = URL.createObjectURL(blob);
+    wechatQR.value.scene = scene;
+    wechatQR.value.status = 'scanning';
+    startWechatPoll(scene);
+  } catch {
+    wechatQR.value.status = 'error';
+    wechatQR.value.error = '获取二维码失败';
+  }
+};
+
+const startWechatPoll = (scene: string) => {
+  clearWechatPoll();
+  let elapsed = 0;
+  wechatPollTimer = setInterval(async () => {
+    elapsed += 2;
+    if (elapsed > 300) {
+      wechatQR.value.status = 'expired';
+      wechatQR.value.error = '二维码已过期';
+      clearWechatPoll();
+      return;
+    }
+    try {
+      const res = await get<ApiResponse<{ status: string; access_token?: string }>>(
+        `/auth/wechat/scene/${scene}`
+      );
+      if (res.data.status === 'confirmed' && res.data.access_token) {
+        clearWechatPoll();
+        setAccessToken(res.data.access_token);
+        await fetchUserInfo();
+        emit('loginSuccess');
+        closeModal();
+      } else if (res.data.status === 'expired') {
+        wechatQR.value.status = 'expired';
+        wechatQR.value.error = '二维码已过期';
+        clearWechatPoll();
+      }
+    } catch {
+      // 轮询失败静默忽略
+    }
+  }, 2000);
+};
+
+const refreshWechatQR = () => {
+  showWechatQR();
+};
+
+const backToLoginForm = () => {
+  wechatQR.value = { visible: false, imageUrl: '', scene: '', status: '', error: '' };
+  clearWechatPoll();
 };
 
 const formData = ref({
@@ -72,12 +158,14 @@ const toggleMode = () => {
 const closeModal = () => {
   emit('update:modelValue', false);
   pauseCountdown();
+  clearWechatPoll();
   setTimeout(() => {
     formData.value = { email: '', nickname: '', password: '', website: '', code: '' };
     confirmPassword.value = '';
     clearMessages();
     countdown.value = 0;
     mode.value = 'login';
+    wechatQR.value = { visible: false, imageUrl: '', scene: '', status: '', error: '' };
   }, 300);
 };
 
@@ -455,6 +543,13 @@ const handleSubmit = async () => {
                 <i v-if="oauthLoading === 'oidc'" class="ri-loader-4-line spin" />
                 <i v-else class="ri-door-open-fill" />
               </button>
+              <button
+                v-if="oauthConfig['wechat.enabled'] === 'true'"
+                class="social-btn wechat"
+                @click="showWechatQR"
+              >
+                <i class="ri-wechat-fill" />
+              </button>
             </div>
           </div>
 
@@ -470,6 +565,48 @@ const handleSubmit = async () => {
             <a @click.prevent="mode === 'login' ? toggleMode() : (mode = 'login')">
               {{ mode === 'login' ? '立即注册' : mode === 'register' ? '立即登录' : '返回登录' }}
             </a>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <!-- 微信扫码登录弹窗 -->
+  <Teleport to="body">
+    <Transition name="fade">
+      <div v-if="wechatQR.visible" class="modal-overlay" @click.self="backToLoginForm">
+        <div class="modal-container wechat-modal">
+          <button class="close-btn" @click="backToLoginForm">
+            <i class="ri-close-line" />
+          </button>
+          <div class="wechat-qr-section">
+            <h3 class="qr-title">微信扫码登录</h3>
+            <div v-if="wechatQR.status === 'loading'" class="qr-loading">
+              <i class="ri-loader-4-line spin" />
+              <p>正在生成二维码...</p>
+            </div>
+            <div v-else-if="wechatQR.status === 'scanning'" class="qr-content">
+              <img :src="wechatQR.imageUrl" alt="微信扫码登录" class="qr-image" />
+              <p class="qr-tip">请使用微信扫码登录</p>
+            </div>
+            <div v-else-if="wechatQR.status === 'expired'" class="qr-content">
+              <div class="qr-expired">
+                <i class="ri-time-line" />
+                <p>{{ wechatQR.error }}</p>
+              </div>
+              <button class="qr-refresh-btn" @click="refreshWechatQR">
+                <i class="ri-refresh-line" /> 刷新二维码
+              </button>
+            </div>
+            <div v-else class="qr-content">
+              <div class="qr-expired">
+                <i class="ri-error-warning-line" />
+                <p>{{ wechatQR.error }}</p>
+              </div>
+              <button class="qr-refresh-btn" @click="refreshWechatQR">
+                <i class="ri-refresh-line" /> 重试
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -555,6 +692,103 @@ const handleSubmit = async () => {
       &.oidc {
         color: var(--flec-oidc-icon, var(--theme-color));
       }
+
+      &.wechat {
+        color: var(--flec-wechat-icon, #07c160);
+      }
+    }
+  }
+}
+
+.wechat-modal {
+  max-width: 400px;
+  padding: 2rem;
+}
+
+.wechat-qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+
+  .qr-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--font-color);
+    margin: 0 0 0.5rem;
+  }
+
+  .qr-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem 0;
+    color: var(--theme-meta-color);
+
+    i {
+      font-size: 2rem;
+      color: var(--theme-color);
+    }
+
+    p {
+      font-size: 0.9rem;
+    }
+  }
+
+  .qr-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+
+    .qr-image {
+      width: 200px;
+      height: 200px;
+      border-radius: 0.5rem;
+      border: 1px solid var(--flec-border);
+    }
+
+    .qr-tip {
+      font-size: 0.9rem;
+      color: var(--theme-meta-color);
+    }
+
+    .qr-expired {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1.5rem 0;
+      color: var(--theme-meta-color);
+
+      i {
+        font-size: 3rem;
+        opacity: 0.5;
+      }
+
+      p {
+        font-size: 0.9rem;
+      }
+    }
+
+    .qr-refresh-btn {
+      padding: 0.5rem 1.5rem;
+      background: var(--theme-color);
+      color: var(--font-light-color);
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: opacity 0.3s;
+
+      &:hover {
+        opacity: 0.85;
+      }
+
+      i {
+        margin-right: 0.25rem;
+      }
     }
   }
 }
@@ -564,6 +798,7 @@ const handleSubmit = async () => {
   --flec-google-icon: #5383ec;
   --flec-qq-icon: #12b7f5;
   --flec-oidc-icon: #6366f1;
+  --flec-wechat-icon: #07c160;
 }
 
 :global([data-theme='dark']) {
@@ -572,6 +807,7 @@ const handleSubmit = async () => {
   --flec-qq-icon: #5cd9ff;
   --flec-microsoft-icon: #41bce9;
   --flec-oidc-icon: #a5b4fc;
+  --flec-wechat-icon: #07c160;
 }
 
 .close-btn {
