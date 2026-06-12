@@ -17,6 +17,14 @@ RUN npm ci
 # 复制源代码
 COPY . .
 
+# 安装主题依赖
+RUN for dir in themes/*/; do \
+      if [ -f "${dir}package.json" ]; then \
+        echo "Installing deps for ${dir}" && \
+        (cd "${dir}" && npm install --production --no-audit --no-fund); \
+      fi; \
+    done
+
 # 注入版本号并构建应用
 ENV FLECBLOG_VERSION=${APP_VERSION}
 RUN npm run build
