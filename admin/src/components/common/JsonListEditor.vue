@@ -22,85 +22,120 @@
 
       <!-- 动态字段 -->
       <template v-for="field in fields" :key="field.key">
-        <!-- 文本输入 -->
-        <el-input
-          v-if="field.type === 'text'"
-          v-model="item[field.key]"
-          :placeholder="field.placeholder"
-          :style="field.style"
-          :disabled="disabled"
-          @input="emitUpdate"
-        />
-
-        <!-- 下拉选择 -->
-        <el-select
-          v-else-if="field.type === 'select'"
-          v-model="item[field.key]"
-          :placeholder="field.placeholder"
-          :style="field.style"
-          :disabled="disabled"
-          :filterable="field.filterable"
-          :allow-create="field.allowCreate"
-          @change="emitUpdate"
-        >
-          <template v-if="field.prefix" #prefix>{{ field.prefix }}</template>
-          <el-option
-            v-for="option in field.options"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          >
-            <template v-if="option.icon">
-              <i :class="option.icon" style="margin-right: 8px; font-size: 16px"></i>
-              {{ option.label }}
-            </template>
-          </el-option>
-        </el-select>
-
-        <!-- 颜色选择器 -->
+        <!-- 颜色选择器：自然宽度，不参与 flex -->
         <el-color-picker
-          v-else-if="field.type === 'color'"
+          v-if="field.type === 'color'"
           v-model="item[field.key]"
           :disabled="disabled"
           @change="emitUpdate"
         />
 
-        <!-- 图片URL输入 -->
-        <el-input
-          v-else-if="field.type === 'image'"
-          v-model="item[field.key]"
-          :placeholder="field.placeholder || '图片URL'"
-          :style="field.style"
-          :disabled="disabled"
-          @input="emitUpdate"
-        >
-          <template #append>
-            <el-upload
-              :show-file-list="false"
-              :http-request="(opts: UploadRequestOptions) => handleUpload(opts, index, field)"
-              accept="image/*"
-              :disabled="disabled"
+        <!-- 其他字段：flex 按 width 权重分配 -->
+        <div v-else :style="{ flex: field.width ?? 1 }">
+          <!-- 文本输入 -->
+          <el-input
+            v-if="field.type === 'text'"
+            v-model="item[field.key]"
+            :placeholder="field.placeholder"
+            :style="field.style"
+            :disabled="disabled"
+            @input="emitUpdate"
+          />
+
+          <!-- 下拉选择 -->
+          <el-select
+            v-else-if="field.type === 'select'"
+            v-model="item[field.key]"
+            :placeholder="field.placeholder"
+            :style="field.style"
+            :disabled="disabled"
+            :filterable="field.filterable"
+            :allow-create="field.allowCreate"
+            @change="emitUpdate"
+          >
+            <template v-if="field.prefix" #prefix>{{ field.prefix }}</template>
+            <el-option
+              v-for="option in field.options"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
             >
-              <el-button :icon="Upload" :loading="uploadingKey === `${index}-${field.key}`" />
-            </el-upload>
-          </template>
-        </el-input>
+              <template v-if="option.icon">
+                <i :class="option.icon" style="margin-right: 8px; font-size: 16px"></i>
+                {{ option.label }}
+              </template>
+            </el-option>
+          </el-select>
+
+          <!-- 带上传的文本输入 -->
+          <el-input
+            v-else-if="field.type === 'upload'"
+            v-model="item[field.key]"
+            :placeholder="field.placeholder || '图片URL'"
+            :style="field.style"
+            :disabled="disabled"
+            @input="emitUpdate"
+          >
+            <template #append>
+              <el-upload
+                :show-file-list="false"
+                :http-request="(opts: UploadRequestOptions) => handleUpload(opts, index, field)"
+                accept="image/*"
+                :disabled="disabled"
+              >
+                <el-button :icon="Upload" :loading="uploadingKey === `${index}-${field.key}`" />
+              </el-upload>
+            </template>
+          </el-input>
+
+          <!-- 日期 -->
+          <el-date-picker
+            v-else-if="field.type === 'date'"
+            v-model="item[field.key]"
+            type="date"
+            value-format="YYYY-MM-DD"
+            :placeholder="field.placeholder || '选择日期'"
+            :disabled="disabled"
+            @change="emitUpdate"
+          />
+
+          <!-- 时间 -->
+          <el-time-picker
+            v-else-if="field.type === 'time'"
+            v-model="item[field.key]"
+            value-format="HH:mm:ss"
+            :placeholder="field.placeholder || '选择时间'"
+            :disabled="disabled"
+            @change="emitUpdate"
+          />
+
+          <!-- 日期时间 -->
+          <el-date-picker
+            v-else-if="field.type === 'datetime'"
+            v-model="item[field.key]"
+            type="datetime"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            :placeholder="field.placeholder || '选择日期时间'"
+            :disabled="disabled"
+            @change="emitUpdate"
+          />
+        </div>
       </template>
 
       <!-- 删除按钮 -->
       <el-button
-        v-if="!hideControls"
+        v-if="!hideControls && !isFixed"
         type="danger"
         :icon="Delete"
         circle
         size="small"
         @click="removeItem(index)"
-        :disabled="disabled"
+        :disabled="disabled || internalValue.length <= (props.min ?? 0)"
       />
     </div>
 
     <!-- 添加按钮行 -->
-    <div v-if="!hideControls" class="editor-item add-row">
+    <div v-if="!hideControls && !isFixed && !isAtMax" class="editor-item add-row">
       <el-button
         type="primary"
         :icon="Plus"
@@ -114,15 +149,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Delete, Plus, ArrowUp, ArrowDown, Upload } from '@element-plus/icons-vue';
 import { ElMessage, type UploadRequestOptions } from 'element-plus';
 import { uploadFile } from '@/api/file';
 
 export interface FieldConfig {
   key: string;
-  type: 'text' | 'select' | 'color' | 'image';
+  type: 'text' | 'select' | 'color' | 'upload' | 'date' | 'time' | 'datetime';
   placeholder?: string;
+  /** 列宽权重，默认 1，设 2 即占两倍宽 */
+  width?: number;
   style?: string;
   prefix?: string;
   filterable?: boolean;
@@ -139,12 +176,16 @@ export interface JsonListEditorProps {
   defaultItem?: Record<string, any>;
   disabled?: boolean;
   hideControls?: boolean;
+  min?: number;
+  max?: number;
 }
 
 const props = withDefaults(defineProps<JsonListEditorProps>(), {
   disabled: false,
   defaultItem: () => ({}),
   hideControls: false,
+  min: 0,
+  max: undefined,
 });
 
 const emit = defineEmits<{
@@ -159,11 +200,38 @@ const internalValue = ref<any[]>([]);
 // 上传状态
 const uploadingKey = ref<string | null>(null);
 
+// 是否固定数量
+const isFixed = computed(() => {
+  return props.min != null && props.max != null && props.min === props.max && props.min > 0;
+});
+
+// 是否已达上限
+const isAtMax = computed(() => {
+  return props.max != null && internalValue.value.length >= props.max;
+});
+
+// 生成默认项
+const makeDefaultItem = (): Record<string, unknown> => {
+  const item: Record<string, unknown> = { ...props.defaultItem };
+  props.fields.forEach(({ key }) => {
+    if (!(key in item)) item[key] = '';
+  });
+  return item;
+};
+
 // 监听 modelValue 变化
 watch(
   () => props.modelValue,
   newVal => {
-    internalValue.value = JSON.parse(JSON.stringify(newVal || []));
+    const arr = JSON.parse(JSON.stringify(newVal || []));
+    // 最少显示 1 行；min > 0 时补齐到 min 数量
+    const minRows = Math.max(1, props.min ?? 1);
+    if (arr.length < minRows) {
+      while (arr.length < minRows) {
+        arr.push(makeDefaultItem());
+      }
+    }
+    internalValue.value = arr;
   },
   { immediate: true, deep: true }
 );
@@ -195,18 +263,17 @@ const moveDown = (index: number) => {
 
 // 删除项
 const removeItem = (index: number) => {
+  // min 保护：不低于最小数量
+  if (props.min != null && internalValue.value.length <= props.min) return;
   internalValue.value.splice(index, 1);
   emitUpdate();
 };
 
 // 添加项
 const addItem = () => {
-  const newItem = { ...props.defaultItem };
-  // 确保所有字段都有默认值
-  props.fields.forEach(({ key }) => {
-    if (!(key in newItem)) newItem[key] = '';
-  });
-  internalValue.value.push(newItem);
+  // max 保护：不超过最大数量
+  if (props.max != null && internalValue.value.length >= props.max) return;
+  internalValue.value.push(makeDefaultItem());
   emitUpdate();
 };
 

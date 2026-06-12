@@ -12,8 +12,11 @@ import (
 	"flec_blog/pkg/feishu"
 	mcpserver "flec_blog/pkg/mcp"
 	"flec_blog/pkg/notification"
+	"flec_blog/pkg/panel"
 	"flec_blog/pkg/scheduler"
 	"flec_blog/pkg/upload"
+
+	"context"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -39,12 +42,13 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 	statsRepo := repository.NewStatsRepository(db.DB)
 	friendRepo := repository.NewFriendRepository(db.DB)
 	momentRepo := repository.NewMomentRepository(db.DB)
-	menuRepo := repository.NewMenuRepository(db.DB)
 	notificationRepo := repository.NewNotificationRepository(db.DB)
 	feedbackRepo := repository.NewFeedbackRepository(db.DB)
 	subscriberRepo := repository.NewSubscriberRepository(db.DB)
 	rssFeedRepo := repository.NewRssFeedRepository(db.DB)
 	settingRepo := repository.NewSettingRepository(db.DB)
+	themeRepo := repository.NewThemeRepository(db.DB)
+	premiumRepo := repository.NewPremiumRepository(db.DB)
 
 	// 初始化上传系统
 	uploadManager := upload.InitializeUploadSystem(conf)
@@ -64,36 +68,39 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 	// Swagger API文档
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	fileService := service.NewFileService(fileRepo, uploadManager)
-	fileUsageChecker := service.NewFileUsageChecker(articleRepo, friendRepo, momentRepo, settingRepo, userRepo, menuRepo, feedbackRepo, commentRepo)
+	fileUsageChecker := service.NewFileUsageChecker(articleRepo, friendRepo, momentRepo, settingRepo, themeRepo, userRepo, feedbackRepo, commentRepo)
 	fileService.SetUsageChecker(fileUsageChecker)
 
 	// 初始化服务
 	emailClient := email.Initialize(conf)
 	feishuClient := feishu.Initialize(conf)
 	notificationSvc := notification.NewService(emailClient, feishuClient, conf)
+	panelClient := panel.NewClient()
 	userService := service.NewUserService(userRepo, fileService, conf)
 	verificationService := service.NewVerificationService(verificationRepo, userRepo, emailClient, conf)
 	articleService := service.NewArticleService(articleRepo, tagRepo, categoryRepo, commentRepo, fileService, db.DB)
 	tagService := service.NewTagService(tagRepo, articleRepo)
 	categoryService := service.NewCategoryService(categoryRepo, articleRepo)
-	notificationService := service.NewNotificationService(notificationRepo, notificationSvc)
+	notificationService := service.NewNotificationService(notificationRepo, notificationSvc, panelClient)
 	commentService := service.NewCommentService(commentRepo, articleRepo, userRepo, notificationService, fileService)
 	statsService := service.NewStatsService(statsRepo, conf)
 	friendService := service.NewFriendService(friendRepo, fileService, notificationService)
 	momentService := service.NewMomentService(momentRepo, fileService)
-	menuService := service.NewMenuService(menuRepo, fileService)
 	feedbackService := service.NewFeedbackService(feedbackRepo, notificationService, fileService)
 	subscriberService := service.NewSubscriberService(subscriberRepo, emailClient, conf)
 	rssFeedService := service.NewRssFeedService(rssFeedRepo, notificationService)
-	systemService := service.NewSystemService(db.DB, uploadManager, emailClient, feishuClient, notificationService)
+	systemService := service.NewSystemService(db.DB, uploadManager, emailClient, feishuClient, notificationService, panelClient)
 	feishu.InitCardHandlers(friendService, commentService, userService, statsService, systemService, rssFeedService)
+	premiumService := service.NewPremiumService(premiumRepo, panelClient)
+	themeService := service.NewThemeService(themeRepo, fileService, premiumService, panelClient)
+	themeService.SyncThemeMetadata(context.Background()) // 启动时同步磁盘元数据到数据库
 	settingService := service.NewSettingService(db.DB)
 	settingService.SetConfig(conf)                         // 设置全局配置对象，用于热重载
 	settingService.SetFileService(fileService)             // 设置文件服务，用于文件状态管理
 	articleService.SetSubscriberService(subscriberService) // 设置订阅服务，用于文章推送
 
 	// 初始化并启动定时任务调度器
-	initScheduler(fileService, userService, verificationService, rssFeedService, friendService)
+	initScheduler(fileService, userService, verificationService, rssFeedService, friendService, premiumService)
 
 	// 初始化控制器
 	userController := v1.NewUserController(userService, verificationService, settingService, conf)
@@ -105,7 +112,6 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 	statsHandler := v1.NewStatsHandler(statsService)
 	friendController := v1.NewFriendController(friendService)
 	momentController := v1.NewMomentController(momentService)
-	menuHandler := v1.NewMenuHandler(menuService)
 	notificationController := v1.NewNotificationController(notificationService)
 	feedbackHandler := v1.NewFeedbackHandler(feedbackService)
 	subscriberHandler := v1.NewSubscriberHandler(subscriberService)
@@ -116,6 +122,8 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 	toolsHandler := v1.NewToolsController()
 	aiController := v1.NewAIController(settingService)
 	rssFeedController := v1.NewRssFeedController(rssFeedService)
+	themeController := v1.NewThemeController(themeService)
+	premiumController := v1.NewPremiumController(premiumService)
 
 	// MCP 接口
 	mcpHandler := gin.WrapH(mcpserver.NewPublicHandler(
@@ -136,6 +144,9 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 	{
 		// ==================== 站点配置（公开接口）====================
 		frontendAPI.GET("/settings/:group", settingController.GetPublicSettingGroup)
+
+		// ==================== 主题相关（公开接口）====================
+		frontendAPI.GET("/themes/active/schema", themeController.GetActiveSchema)
 
 		// ==================== 统计数据收集（公开接口）====================
 		frontendAPI.POST("/collect", statsHandler.Collect)
@@ -229,10 +240,6 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 			// 公开接口
 			momentGroup.GET("", momentController.ListForWeb) // 获取动态列表
 		}
-
-		// ==================== 菜单相关 ====================
-		// 公开接口：获取菜单树（支持按类型筛选）
-		frontendAPI.GET("/menus", menuHandler.ListForWeb)
 
 		// ==================== 评论相关 ====================
 		commentGroup := frontendAPI.Group("/comments")
@@ -401,16 +408,6 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 			statsManagement.GET("/visits", statsHandler.GetVisitLogs)                 // 获取访问日志
 		}
 
-		// ==================== 菜单管理 ====================
-		menuManagement := adminAPI.Group("/menus")
-		{
-			menuManagement.GET("", menuHandler.List)          // 获取菜单树
-			menuManagement.GET("/:id", menuHandler.Get)       // 获取菜单详情
-			menuManagement.POST("", menuHandler.Create)       // 创建菜单
-			menuManagement.PUT("/:id", menuHandler.Update)    // 更新菜单
-			menuManagement.DELETE("/:id", menuHandler.Delete) // 删除菜单
-		}
-
 		// ==================== 反馈管理 ====================
 		feedbackManagement := adminAPI.Group("/feedback")
 		{
@@ -439,9 +436,11 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 		// ==================== 系统信息 ====================
 		systemManagement := adminAPI.Group("/system")
 		{
-			systemManagement.GET("/static", systemController.GetSystemStatic)    // 获取系统静态信息
-			systemManagement.GET("/dynamic", systemController.GetSystemDynamic)  // 获取系统动态信息
-			systemManagement.POST("/check-update", systemController.CheckUpdate) // 检查版本更新
+			systemManagement.GET("/static", systemController.GetSystemStatic)                                     // 获取系统静态信息
+			systemManagement.GET("/dynamic", systemController.GetSystemDynamic)                                   // 获取系统动态信息
+			systemManagement.POST("/check-update", systemController.CheckUpdate)                                  // 检查版本更新
+			systemManagement.POST("/upgrade", middleware.IsSuperAdmin(), systemController.Upgrade)                // 系统升级（仅超级管理员）
+			systemManagement.GET("/upgrade/status", middleware.IsSuperAdmin(), systemController.GetUpgradeStatus) // 查询升级进度（仅超级管理员）
 		}
 
 		// ==================== 管理工具相关 ====================
@@ -471,13 +470,36 @@ func InitRouter(db *database.Database, conf *config.Config) *gin.Engine {
 			subscriberManagement.GET("", subscriberHandler.List)          // 获取订阅者列表
 			subscriberManagement.DELETE("/:id", subscriberHandler.Delete) // 删除订阅者
 		}
+
+		// ==================== 主题管理 ====================
+		themeManagement := adminAPI.Group("/themes")
+		{
+			themeManagement.GET("", themeController.List)                                     // 获取主题列表
+			themeManagement.GET("/:slug", themeController.Get)                                // 获取主题详情
+			themeManagement.POST("/install", themeController.InstallFromZip)                  // 安装主题
+			themeManagement.POST("/:slug/activate", themeController.Activate)                 // 激活主题
+			themeManagement.PUT("/:slug/config", themeController.UpdateConfig)                // 更新主题配置
+			themeManagement.GET("/:slug/menus", themeController.GetMenus)                     // 获取主题菜单
+			themeManagement.PUT("/:slug/menus", themeController.UpdateMenus)                  // 更新主题菜单
+			themeManagement.DELETE("/:slug", themeController.Delete)                          // 删除主题
+			themeManagement.GET("/blog-rebuild-status", themeController.GetBlogRebuildStatus) // 查询 Blog 重建状态
+			themeManagement.POST("/:slug/market-install", themeController.InstallFromMarket)  // 从市场下载并安装主题
+			themeManagement.GET("/task-status", themeController.GetTaskStatus)                // 查询当前任务状态
+		}
+
+		// ==================== 会员系统 ====================
+		premiumManagement := adminAPI.Group("/premium")
+		{
+			premiumManagement.GET("/status", premiumController.GetStatus)   // 查询会员状态
+			premiumManagement.POST("/activate", premiumController.Activate) // 激活会员
+		}
 	}
 
 	return r
 }
 
 // initScheduler 初始化并启动定时任务调度器
-func initScheduler(fileService *service.FileService, userService *service.UserService, verificationService *service.VerificationService, rssFeedService *service.RssFeedService, friendService *service.FriendService) {
+func initScheduler(fileService *service.FileService, userService *service.UserService, verificationService *service.VerificationService, rssFeedService *service.RssFeedService, friendService *service.FriendService, premiumService *service.PremiumService) {
 	s := scheduler.NewScheduler()
 
 	// 注册清理任务
@@ -492,6 +514,9 @@ func initScheduler(fileService *service.FileService, userService *service.UserSe
 
 	// 友链检测任务
 	_ = s.AddJob(scheduler.NewJob("友链状态检测", "0 0 2 * * 3", friendService.CheckAllFriends))
+
+	// 会员数据校准（每天凌晨 5 点）
+	_ = s.AddJob(scheduler.NewJob("会员数据校准", "0 0 5 * * *", func() error { return premiumService.Calibrate(context.Background()) }))
 
 	s.Start()
 }

@@ -1110,8 +1110,8 @@ watch(
 
     // 获取 Meting-API 配置
     try {
-      const blogSettings = await getSettingGroup('blog');
-      const apiUrl = blogSettings['blog.meting_api'] || '';
+      const settings = await getSettingGroup('basic');
+      const apiUrl = settings['meting_api'] || '';
       if (apiUrl) metingApiUrl.value = apiUrl;
     } catch {
       // 使用默认值

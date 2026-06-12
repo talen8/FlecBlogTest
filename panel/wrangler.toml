@@ -14,5 +14,39 @@ database_id = "b39b8f3d-1734-498a-a3aa-ad05b1356ea7"
 [triggers]
 crons = ["0 * * * *"]
 
+[vars]
+R2_PUBLIC_URL = "https://file.flec.top"
+
+[[r2_buckets]]
+binding = "THEME_ASSETS"
+bucket_name = "flec-r2"
+
 [observability]
+enabled = true
+
+# ============ 测试环境 ============
+[env.test]
+name = "flec-panel-test"
+compatibility_date = "2024-05-01"
+
+[env.test.assets]
+directory = "public"
+binding = "ASSETS"
+
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "flec-panel-test-d1"
+database_id = "b9e53ca5-0ffb-4f95-8ddb-c641bdd0a67d"
+
+[env.test.triggers]
+crons = ["0 * * * *"]
+
+[env.test.vars]
+R2_PUBLIC_URL = "https://file.flec.top"
+
+[[env.test.r2_buckets]]
+binding = "THEME_ASSETS"
+bucket_name = "flec-r2"
+
+[env.test.observability]
 enabled = true

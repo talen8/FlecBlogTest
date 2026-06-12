@@ -1,6 +1,20 @@
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** 读取激活的主题名称 */
+function getActiveTheme(): string {
+  return process.env.NUXT_PUBLIC_ACTIVE_THEME || 'default';
+}
+
+const activeTheme = getActiveTheme();
+const themePath = `./themes/${activeTheme}`;
+
 export default defineNuxtConfig({
+  // Nuxt Layers：主题作为完整 Nuxt Layer 自动处理布局/页面/组件/composables/插件
+  extends: [themePath],
   compatibilityDate: '2025-07-15',
-  devtools: { enabled: true },
 
   // 启用 SSR
   ssr: true,
@@ -48,8 +62,8 @@ export default defineNuxtConfig({
     ],
   ],
 
-  // CSS 配置
-  css: ['@/assets/css/color.css', '@/assets/css/global.scss', 'remixicon/fonts/remixicon.css'],
+  // CSS 配置 — 核心通用样式，主题 CSS 由主题 Layer 自行声明
+  css: ['@/assets/css/base.scss', 'remixicon/fonts/remixicon.css'],
 
   // SEO 配置
   site: {
@@ -76,6 +90,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiUrl: '',
+      activeTheme,
       appVersion: process.env.FLECBLOG_VERSION || '1.0.0',
     },
   },
@@ -108,7 +123,7 @@ export default defineNuxtConfig({
       periodicSyncForUpdates: 3600, // 每小时检查更新
     },
     devOptions: {
-      enabled: true,
+      enabled: false,
       type: 'module',
     },
   },
@@ -179,14 +194,5 @@ export default defineNuxtConfig({
     options: {
       scrollBehaviorType: 'smooth',
     },
-  },
-
-  // 排除不应出现在 sitemap 中的路径
-  routeRules: {
-    '/oauth/**': { sitemap: false },
-    '/profile': { sitemap: false },
-    '/notifications': { sitemap: false },
-    '/feedback': { sitemap: false },
-    '/subscribe': { sitemap: false },
   },
 });

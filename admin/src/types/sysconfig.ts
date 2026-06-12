@@ -1,2 +1,2 @@
 // 配置分组类型
-export type SettingGroupType = 'basic' | 'blog' | 'notification' | 'upload' | 'ai' | 'oauth';
+export type SettingGroupType = 'basic' | 'notification' | 'upload' | 'ai' | 'oauth';

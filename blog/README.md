@@ -9,7 +9,7 @@
 - **样式**: SCSS
 - **SEO**: @nuxtjs/seo, Sitemap, Atom Feed
 - **PWA**: @vite-pwa/nuxt
-- **其他**: TypeScript, VueUse, dayjs, Lenis, medium-zoom, APlayer
+- **其他**: TypeScript, VueUse, dayjs, medium-zoom, APlayer
 
 ## 文件结构
 

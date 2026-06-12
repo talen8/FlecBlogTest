@@ -2,10 +2,7 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"runtime"
 	"strconv"
@@ -16,6 +13,8 @@ import (
 	"flec_blog/internal/dto"
 	"flec_blog/pkg/email"
 	feishupkg "flec_blog/pkg/feishu"
+	"flec_blog/pkg/logger"
+	"flec_blog/pkg/panel"
 	"flec_blog/pkg/upload"
 
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -27,24 +26,15 @@ import (
 	"gorm.io/gorm"
 )
 
-const panelBaseURL = "https://panel.flec.top"
-
 const panelSyncInterval = 5 * time.Minute
-
-type panelVersion struct {
-	ID      int    `json:"id"`
-	Version string `json:"version"`
-	Date    string `json:"date"`
-	Changes string `json:"changes"`
-}
 
 // AppVersion 由构建参数注入，默认 dev
 var AppVersion = "dev"
 
 // VersionStatus 版本检测状态
 type VersionStatus struct {
-	LatestVersion  string `json:"latest_version"`
-	LastCheckError string `json:"last_check_error"`
+	LatestVersions []panel.Version `json:"latest_versions,omitempty"`
+	LastCheckError string          `json:"last_check_error"`
 }
 
 // SystemService 系统服务
@@ -54,7 +44,7 @@ type SystemService struct {
 	emailClient         *email.Client
 	feishuClient        *feishupkg.Client
 	notificationService *NotificationService
-	httpClient          *http.Client
+	panel               *panel.Client
 	mu                  sync.RWMutex
 	versionStatus       VersionStatus
 	lastPanelSyncTime   time.Time
@@ -66,14 +56,14 @@ type parsedVersion struct {
 }
 
 // NewSystemService 创建系统服务
-func NewSystemService(db *gorm.DB, uploadManager *upload.Manager, emailClient *email.Client, feishuClient *feishupkg.Client, notificationService *NotificationService) *SystemService {
+func NewSystemService(db *gorm.DB, uploadManager *upload.Manager, emailClient *email.Client, feishuClient *feishupkg.Client, notificationService *NotificationService, panelClient *panel.Client) *SystemService {
 	return &SystemService{
 		db:                  db,
 		uploadManager:       uploadManager,
 		emailClient:         emailClient,
 		feishuClient:        feishuClient,
 		notificationService: notificationService,
-		httpClient:          &http.Client{Timeout: 10 * time.Second},
+		panel:               panelClient,
 	}
 }
 
@@ -109,6 +99,7 @@ func (s *SystemService) GetStaticInfo() *dto.SystemStaticInfo {
 	info.EmailStatus = s.checkEmail()
 	info.FeishuStatus = s.checkFeishu()
 	info.AppVersion = currentVersion()
+	info.BuildOfficial = panel.PanelAPIKey != ""
 
 	return info
 }
@@ -124,7 +115,9 @@ func (s *SystemService) GetDynamicInfo() *dto.SystemDynamicInfo {
 	s.setDynamicDB(info)
 
 	status := s.GetVersionStatus()
-	info.VersionLatestVersion = status.LatestVersion
+	if len(status.LatestVersions) > 0 {
+		info.VersionLatestVersion = status.LatestVersions[0].Version
+	}
 	info.VersionLastCheckError = status.LastCheckError
 
 	go s.maybeSyncPanelInfo()
@@ -158,129 +151,90 @@ func (s *SystemService) GetSystemStatus(_ context.Context) (*feishupkg.SystemSta
 
 // CheckForUpdates 检查是否有新版本
 func (s *SystemService) CheckForUpdates() error {
-	latest, err := s.fetchLatestVersion(context.Background())
+	versions, err := s.panel.FetchVersions(context.Background())
 	if err != nil {
-		s.setVersionStatus(VersionStatus{LastCheckError: err.Error()})
+		s.setVersionError(err.Error())
 		return err
 	}
-
-	latestVersion := strings.TrimSpace(latest.Version)
-	if latestVersion == "" {
-		err = fmt.Errorf("版本信息缺少 version 字段")
-		s.setVersionStatus(VersionStatus{LastCheckError: err.Error()})
-		return err
+	if len(versions) == 0 {
+		s.setVersionError("没有可用的版本信息")
+		return nil
 	}
-
-	status := VersionStatus{
-		LatestVersion:  latestVersion,
-		LastCheckError: "",
-	}
-
-	currentVersion := currentVersion()
-	if strings.EqualFold(currentVersion, "dev") {
-		s.setVersionStatus(status)
+	if strings.TrimSpace(versions[0].Version) == "" {
+		s.setVersionError("版本信息缺少 version 字段")
 		return nil
 	}
 
-	compareResult, err := compareVersion(latestVersion, currentVersion)
-	if err != nil {
-		err = fmt.Errorf("比较版本失败: %w", err)
-		status.LastCheckError = err.Error()
-		s.setVersionStatus(status)
-		return err
+	s.setVersionStatus(VersionStatus{LatestVersions: versions})
+	return nil
+}
+
+// maybeSyncPanelInfo 按需同步 Panel 信息
+func (s *SystemService) maybeSyncPanelInfo() {
+	s.mu.Lock()
+	if time.Since(s.lastPanelSyncTime) < panelSyncInterval {
+		s.mu.Unlock()
+		return
+	}
+	s.lastPanelSyncTime = time.Now()
+	s.mu.Unlock()
+
+	if err := s.CheckForUpdates(); err != nil {
+		logger.Warn("同步版本信息失败: %v", err)
+		return
 	}
 
-	if compareResult > 0 {
-		exists, err := s.notificationService.HasVersionUpdateNotification(context.Background(), latestVersion)
-		if err != nil {
-			status.LastCheckError = err.Error()
-			s.setVersionStatus(status)
-			return err
-		}
-
-		if !exists {
-			releaseURL := "https://github.com/talen8/FlecBlog/releases"
-			if err := s.notificationService.NotifyVersionUpdateToSuperAdmins(context.Background(), currentVersion, latestVersion, releaseURL); err != nil {
-				status.LastCheckError = err.Error()
-				s.setVersionStatus(status)
-				return err
+	// 检测到新版本时通知管理员
+	status := s.GetVersionStatus()
+	if len(status.LatestVersions) > 0 {
+		latest := strings.TrimSpace(status.LatestVersions[0].Version)
+		currentVer := currentVersion()
+		if !strings.EqualFold(currentVer, "dev") {
+			if cmp, err := compareVersion(latest, currentVer); err == nil && cmp > 0 {
+				ctx := context.Background()
+				if exists, _ := s.notificationService.HasVersionUpdateNotification(ctx, latest); !exists {
+					releaseURL := "https://github.com/talen8/FlecBlog/releases"
+					_ = s.notificationService.NotifyVersionUpdateToSuperAdmins(ctx, currentVer, latest, releaseURL)
+				}
 			}
 		}
 	}
 
-	s.setVersionStatus(status)
-	return nil
-}
-
-// SyncPanelInfo 同步 Panel 信息（版本+公告）
-func (s *SystemService) SyncPanelInfo() error {
-	if err := s.CheckForUpdates(); err != nil {
-		return err
+	if err := s.notificationService.FetchAndSyncAnnouncements(); err != nil {
+		logger.Warn("同步公告失败: %v", err)
 	}
-	return s.notificationService.FetchAndSyncAnnouncements()
-}
-
-// maybeSyncPanelInfo 按需同步 Panel 信息（带缓存间隔）
-func (s *SystemService) maybeSyncPanelInfo() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if time.Since(s.lastPanelSyncTime) < panelSyncInterval {
-		return
-	}
-
-	s.lastPanelSyncTime = time.Now()
-	go func() { _ = s.SyncPanelInfo() }()
 }
 
 // CheckUpdate 检查更新并返回详细信息
-func (s *SystemService) CheckUpdate(ctx context.Context) *dto.CheckUpdateResponse {
+func (s *SystemService) CheckUpdate(_ context.Context) *dto.CheckUpdateResponse {
 	currentVer := currentVersion()
-	result := &dto.CheckUpdateResponse{
-		CurrentVersion: currentVer,
-	}
+	result := &dto.CheckUpdateResponse{CurrentVersion: currentVer}
 
-	versions, err := s.fetchAllVersions(ctx)
-	if err != nil {
-		result.LastCheckError = err.Error()
-		s.setVersionStatus(VersionStatus{LastCheckError: err.Error()})
+	_ = s.CheckForUpdates()
+
+	status := s.GetVersionStatus()
+	result.LastCheckError = status.LastCheckError
+	if status.LastCheckError != "" || len(status.LatestVersions) == 0 {
 		return result
 	}
 
-	if len(versions) == 0 {
-		result.LastCheckError = "没有可用的版本信息"
-		s.setVersionStatus(VersionStatus{LastCheckError: result.LastCheckError})
-		return result
-	}
-
-	latestVersion := strings.TrimSpace(versions[0].Version)
+	latestVersion := status.LatestVersions[0].Version
 	result.LatestVersion = latestVersion
 
-	status := VersionStatus{
-		LatestVersion:  latestVersion,
-		LastCheckError: "",
-	}
-
 	if strings.EqualFold(currentVer, "dev") {
-		s.setVersionStatus(status)
 		return result
 	}
 
-	compareResult, err := compareVersion(latestVersion, currentVer)
+	cmp, err := compareVersion(latestVersion, currentVer)
 	if err != nil {
-		err = fmt.Errorf("比较版本失败: %w", err)
-		status.LastCheckError = err.Error()
-		s.setVersionStatus(status)
 		result.LastCheckError = err.Error()
 		return result
 	}
 
-	result.HasUpdate = compareResult > 0
-
+	result.HasUpdate = cmp > 0
 	if result.HasUpdate {
-		for _, v := range versions {
-			cmp, _ := compareVersion(v.Version, currentVer)
-			if cmp > 0 {
+		for _, v := range status.LatestVersions {
+			if c, _ := compareVersion(v.Version, currentVer); c > 0 {
 				result.Versions = append(result.Versions, dto.VersionInfo{
 					ID:      v.ID,
 					Version: v.Version,
@@ -291,37 +245,7 @@ func (s *SystemService) CheckUpdate(ctx context.Context) *dto.CheckUpdateRespons
 		}
 	}
 
-	s.setVersionStatus(status)
 	return result
-}
-
-// fetchAllVersions 获取所有版本列表
-func (s *SystemService) fetchAllVersions(ctx context.Context) ([]panelVersion, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, panelBaseURL+"/api/versions", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "FlecBlog-VersionChecker")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, fmt.Errorf("请求版本列表失败: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var versions []panelVersion
-	if err := json.NewDecoder(resp.Body).Decode(&versions); err != nil {
-		return nil, fmt.Errorf("解析版本列表失败: %w", err)
-	}
-
-	return versions, nil
 }
 
 // GetVersionStatus 获取最近一次版本检测状态
@@ -338,37 +262,11 @@ func (s *SystemService) setVersionStatus(status VersionStatus) {
 	s.versionStatus = status
 }
 
-// fetchLatestVersion 获取最新版本信息
-func (s *SystemService) fetchLatestVersion(ctx context.Context) (*panelVersion, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, panelBaseURL+"/api/versions", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "FlecBlog-VersionChecker")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, fmt.Errorf("请求版本信息失败: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	var versions []panelVersion
-	if err := json.NewDecoder(resp.Body).Decode(&versions); err != nil {
-		return nil, fmt.Errorf("解析版本信息失败: %w", err)
-	}
-
-	if len(versions) == 0 {
-		return nil, fmt.Errorf("没有可用的版本信息")
-	}
-
-	return &versions[0], nil
+// setVersionError 仅更新错误信息，保留已有版本缓存
+func (s *SystemService) setVersionError(errMsg string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.versionStatus.LastCheckError = errMsg
 }
 
 // setDynamicCPU 填充 CPU 动态信息

@@ -42,6 +42,60 @@
         </div>
 
         <div class="info-grid">
+          <!-- 会员 -->
+          <div class="info-section">
+            <div class="section-header">
+              <i class="ri-vip-crown-line icon-warning"></i>
+              <span>会员</span>
+            </div>
+            <div class="section-body">
+              <el-skeleton v-if="premiumLoading" :rows="2" animated />
+
+              <el-alert
+                v-else-if="premiumLoadError"
+                title="会员状态加载失败"
+                description="请确认后端服务已重启，并且后台接口 /admin/premium/status 可以正常访问。"
+                type="warning"
+                show-icon
+                :closable="false"
+              />
+
+              <template v-else>
+                <div class="info-item">
+                  <span class="label">会员类型</span>
+                  <div class="value-with-action">
+                    <span class="value">{{ premiumStatus.active ? '高级会员' : '普通会员' }}</span>
+                    <el-button
+                      v-if="!premiumStatus.active"
+                      type="primary"
+                      size="small"
+                      link
+                      @click="showPremiumDialog('upgrade')"
+                    >
+                      升级
+                    </el-button>
+                    <el-button
+                      v-else-if="premiumStatus.days_remaining >= 0"
+                      type="primary"
+                      size="small"
+                      link
+                      @click="showPremiumDialog('renew')"
+                    >
+                      续费
+                    </el-button>
+                  </div>
+                </div>
+                <div class="info-item">
+                  <span class="label">剩余时长</span>
+                  <span class="value">
+                    <template v-if="premiumStatus.days_remaining < 0">永久</template>
+                    <template v-else>{{ premiumStatus.days_remaining }} 天</template>
+                  </span>
+                </div>
+              </template>
+            </div>
+          </div>
+
           <!-- 服务器 -->
           <div class="info-section">
             <div class="section-header">
@@ -285,35 +339,114 @@
     <!-- 更新内容弹窗 -->
     <el-dialog
       v-model="updateDialogVisible"
-      title="版本更新内容"
+      :title="upgradeMode ? '系统升级进度' : '版本更新内容'"
       width="600px"
       :close-on-click-modal="false"
+      :close-on-press-escape="!upgradeMode"
+      :show-close="upgradeStatus === 'error' || upgradeStatus === 'done'"
+      @closed="handleUpdateDialogClosed"
     >
-      <div v-if="updatingVersions.length > 0">
-        <div v-for="version in updatingVersions" :key="version.id" class="version-item-detail">
-          <div class="version-header">
-            <span class="version-tag">{{ version.version }}</span>
-            <span class="version-date">{{ version.date }}</span>
-          </div>
-          <div class="version-changes" v-html="formatChanges(version.changes)"></div>
+      <template v-if="upgradeMode">
+        <div style="text-align: center; padding: 12px 0">
+          <p style="margin-bottom: 16px; font-size: 14px">{{ upgradeMessage }}</p>
+          <el-progress
+            :percentage="upgradeProgress"
+            :status="
+              upgradeStatus === 'done'
+                ? 'success'
+                : upgradeStatus === 'error'
+                  ? 'exception'
+                  : undefined
+            "
+            :stroke-width="10"
+            style="margin-bottom: 12px"
+          />
+          <p
+            v-if="upgradeStatus === 'done'"
+            style="color: var(--el-color-success); font-size: 14px"
+          >
+            操作已完成
+          </p>
+          <p
+            v-if="upgradeStatus === 'error'"
+            style="color: var(--el-color-danger); font-size: 14px"
+          >
+            操作失败
+          </p>
         </div>
-      </div>
-      <div v-else class="no-changes">暂无更新内容</div>
+      </template>
+      <template v-else>
+        <div v-if="updatingVersions.length > 0">
+          <div v-for="version in updatingVersions" :key="version.id" class="version-item-detail">
+            <div class="version-header">
+              <span class="version-tag">{{ version.version }}</span>
+              <span class="version-date">{{ version.date }}</span>
+            </div>
+            <div class="version-changes" v-html="formatChanges(version.changes)"></div>
+          </div>
+        </div>
+        <div v-else class="no-changes">暂无更新内容</div>
+      </template>
       <template #footer>
-        <el-button type="primary" @click="updateDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="goToGitHub">前往 GitHub</el-button>
+        <template v-if="upgradeMode">
+          <el-button
+            v-if="upgradeStatus === 'done' || upgradeStatus === 'error'"
+            @click="updateDialogVisible = false"
+          >
+            关闭
+          </el-button>
+        </template>
+        <template v-else>
+          <el-button type="primary" @click="updateDialogVisible = false">关闭</el-button>
+          <el-button v-if="hasNewVersion" type="success" @click="handleUpgrade">一键升级</el-button>
+          <el-button type="primary" @click="goToGitHub">前往 GitHub</el-button>
+        </template>
+      </template>
+    </el-dialog>
+
+    <!-- 会员激活弹窗 -->
+    <el-dialog
+      v-model="premiumDialogVisible"
+      :title="premiumDialogTitle"
+      width="460px"
+      :close-on-click-modal="false"
+      @closed="resetPremiumForm"
+    >
+      <el-form ref="premiumFormRef" :model="premiumForm" :rules="premiumRules" label-position="top">
+        <el-form-item label="激活码" prop="code">
+          <el-input
+            v-model="premiumForm.code"
+            placeholder="请输入激活码"
+            maxlength="36"
+            clearable
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="premiumDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="premiumActivating" @click="handlePremiumActivate">
+          确认
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
+import type { FormInstance, FormRules } from 'element-plus';
 import { Monitor, Cpu, Coin, DataLine, FolderOpened, Connection } from '@element-plus/icons-vue';
-import { getSystemStatic, getSystemDynamic, checkUpdate } from '@/api/system';
-import type { SystemStatic, SystemDynamic } from '@/types/system';
-import type { VersionInfo } from '@/api/system';
+import {
+  getSystemStatic,
+  getSystemDynamic,
+  checkUpdate,
+  startUpgrade,
+  getUpgradeStatus,
+} from '@/api/system';
+import { activatePremium, getPremiumStatus } from '@/api/premium';
+import type { SystemStatic, SystemDynamic, VersionInfo, UpgradeStatus } from '@/types/system';
+import type { PremiumStatus } from '@/types/premium';
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -334,6 +467,7 @@ const staticInfo = ref<SystemStatic>({
   email_status: '',
   feishu_status: '',
   app_version: '',
+  build_official: false,
 });
 
 const dynamicInfo = ref<SystemDynamic>({
@@ -358,6 +492,46 @@ const checking = ref(false);
 const updateDialogVisible = ref(false);
 const panelVersions = ref<VersionInfo[]>([]);
 const updatingVersions = ref<VersionInfo[]>([]);
+
+// 升级
+const upgradeMode = ref(false);
+const upgradeStatus = ref('');
+const upgradeProgress = ref(0);
+const upgradeMessage = ref('');
+let upgradePollTimer: ReturnType<typeof setInterval> | null = null;
+
+// 会员
+const premiumLoading = ref(true);
+const premiumLoadError = ref(false);
+const premiumActivating = ref(false);
+const premiumDialogVisible = ref(false);
+const premiumDialogType = ref<'upgrade' | 'renew'>('upgrade');
+const premiumFormRef = ref<FormInstance>();
+const premiumStatus = ref<PremiumStatus>({
+  active: false,
+  days_remaining: 0,
+});
+const premiumForm = reactive({ code: '' });
+const premiumRules: FormRules = {
+  code: [
+    { required: true, message: '请输入激活码', trigger: 'blur' },
+    { min: 10, message: '激活码格式不正确', trigger: 'blur' },
+  ],
+};
+
+const premiumDialogTitle = computed(() =>
+  premiumDialogType.value === 'upgrade' ? '升级高级会员' : '续费高级会员'
+);
+
+const showPremiumDialog = (type: 'upgrade' | 'renew') => {
+  premiumDialogType.value = type;
+  premiumDialogVisible.value = true;
+};
+
+const resetPremiumForm = () => {
+  premiumForm.code = '';
+  premiumFormRef.value?.resetFields();
+};
 
 const latestVersion = computed(() => dynamicInfo.value.version_latest_version);
 
@@ -394,6 +568,9 @@ const showUpdateDialog = async () => {
     })
     .sort((a, b) => compareVersion(b.version, a.version));
 
+  if (!upgradePollTimer) {
+    upgradeMode.value = false;
+  }
   updateDialogVisible.value = true;
 };
 
@@ -440,6 +617,88 @@ const handleCheckUpdate = async () => {
   }
 };
 
+const handleUpgrade = async () => {
+  try {
+    await startUpgrade('all');
+  } catch (err: unknown) {
+    ElMessage.error((err as { message?: string })?.message || '启动升级失败');
+    return;
+  }
+
+  upgradeMode.value = true;
+  upgradeStatus.value = 'starting';
+  upgradeProgress.value = 0;
+  upgradeMessage.value = '正在准备升级...';
+
+  upgradePollTimer = setInterval(async () => {
+    try {
+      const status: UpgradeStatus = await getUpgradeStatus();
+      upgradeProgress.value = status.progress;
+      upgradeMessage.value = status.message;
+      upgradeStatus.value = status.status;
+
+      if (status.status === 'error') {
+        stopUpgradePolling();
+        ElMessage.error(status.message);
+        return;
+      }
+
+      if (status.status === 'done') {
+        stopUpgradePolling();
+        if (status.target === 'server') {
+          reconnectAfterUpgrade();
+        } else {
+          upgradeStatus.value = 'done';
+          upgradeMessage.value = '升级已完成';
+          ElMessage.success('Blog 升级完成');
+          fetchStaticInfo();
+          fetchDynamicInfo();
+        }
+      }
+    } catch {
+      // 服务器重启中，转入重连
+      stopUpgradePolling();
+      reconnectAfterUpgrade();
+    }
+  }, 2000);
+};
+
+const stopUpgradePolling = () => {
+  if (upgradePollTimer) {
+    clearInterval(upgradePollTimer);
+    upgradePollTimer = null;
+  }
+};
+
+const handleUpdateDialogClosed = () => {
+  upgradeMode.value = false;
+  upgradeStatus.value = '';
+};
+
+const reconnectAfterUpgrade = async () => {
+  upgradeMessage.value = '等待服务重启...';
+  upgradeProgress.value = 100;
+
+  for (let i = 0; i < 30; i++) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      await getSystemStatic();
+      upgradeStatus.value = 'done';
+      upgradeMessage.value = '系统升级完成';
+      updateDialogVisible.value = false;
+      ElMessage.success('系统升级完成');
+      fetchStaticInfo();
+      fetchDynamicInfo();
+      return;
+    } catch {
+      // 继续等待
+    }
+  }
+  upgradeStatus.value = 'error';
+  upgradeMessage.value = '服务重启超时，请手动检查';
+  ElMessage.warning('服务重启超时，请手动检查');
+};
+
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   const unit = 1024;
@@ -464,9 +723,39 @@ const getProgressColor = (percentage: number): string => {
   return '#f56c6c';
 };
 
+const loadPremiumStatus = async () => {
+  premiumLoading.value = true;
+  try {
+    premiumStatus.value = await getPremiumStatus();
+    premiumLoadError.value = false;
+  } catch {
+    premiumStatus.value.active = false;
+    premiumLoadError.value = true;
+  } finally {
+    premiumLoading.value = false;
+  }
+};
+
+const handlePremiumActivate = async () => {
+  const valid = await premiumFormRef.value?.validate().catch(() => false);
+  if (!valid) return;
+
+  premiumActivating.value = true;
+  try {
+    premiumStatus.value = await activatePremium({ code: premiumForm.code.trim() });
+    premiumDialogVisible.value = false;
+    ElMessage.success('高级会员激活成功');
+  } catch (err: unknown) {
+    ElMessage.error((err as { message?: string })?.message || '激活失败');
+  } finally {
+    premiumActivating.value = false;
+  }
+};
+
 onMounted(() => {
   fetchStaticInfo();
   fetchDynamicInfo();
+  loadPremiumStatus();
   refreshTimer = setInterval(fetchDynamicInfo, 10000);
 });
 
@@ -475,6 +764,7 @@ onUnmounted(() => {
     clearInterval(refreshTimer);
     refreshTimer = null;
   }
+  stopUpgradePolling();
 });
 </script>
 
@@ -646,9 +936,20 @@ onUnmounted(() => {
     word-break: break-all;
   }
 
+  .value-with-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   :deep(.el-progress__text) {
     min-width: auto;
   }
+}
+
+.icon-warning {
+  color: #e6a23c;
+  font-size: 16px;
 }
 
 .version-link {

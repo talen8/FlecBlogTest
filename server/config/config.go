@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -13,7 +12,6 @@ type Config struct {
 	Database     DatabaseConfig
 	JWT          JWTConfig
 	Basic        BasicConfig        // 从数据库加载
-	Blog         BlogConfig         // 从数据库加载
 	Notification NotificationConfig // 从数据库加载
 	Upload       UploadConfig       // 从数据库加载
 	AI           AIConfig           // 从数据库加载
@@ -24,6 +22,7 @@ type Config struct {
 type ServerConfig struct {
 	Port         int
 	AllowOrigins []string
+	UploadDir    string
 }
 
 // DatabaseConfig 数据库配置
@@ -42,20 +41,16 @@ type JWTConfig struct {
 
 // BasicConfig 基本配置（从数据库动态加载）
 type BasicConfig struct {
-	Author       string // 站长姓名
-	AuthorEmail  string // 站长邮箱
-	AuthorDesc   string // 站长简介
-	AuthorAvatar string // 站长头像
-	AuthorPhoto  string // 站长形象
-	ICP          string // ICP备案号
-	PoliceRecord string // 公安备案号
-	AdminURL     string // 管理地址
-	BlogURL      string // 博客地址
-	HomeURL      string // 主页地址
-}
-
-// BlogConfig 博客配置（从数据库动态加载）
-type BlogConfig struct {
+	Author          string // 站长姓名
+	AuthorEmail     string // 站长邮箱
+	AuthorDesc      string // 站长简介
+	AuthorAvatar    string // 站长头像
+	AuthorPhoto     string // 站长形象
+	ICP             string // ICP备案号
+	PoliceRecord    string // 公安备案号
+	AdminURL        string // 管理地址
+	BlogURL         string // 博客地址
+	HomeURL         string // 主页地址
 	Title           string // 博客标题
 	Subtitle        string // 博客副标题
 	Slogan          string // 博客标语
@@ -151,12 +146,12 @@ type OAuthProviderConfig struct {
 }
 
 // LoadConfig 从环境变量加载配置
-// 注意：Email 和 Upload 配置从数据库动态加载，由 SettingService 管理
 func LoadConfig() (*Config, error) {
 	config := &Config{
 		Server: ServerConfig{
 			Port:         getEnvAsInt("SERVER_PORT", 8080),
 			AllowOrigins: getEnvAsSlice("SERVER_ALLOW_ORIGINS", []string{"*"}),
+			UploadDir:    getEnv("UPLOAD_DIR", "/app/data/uploads"),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -168,18 +163,14 @@ func LoadConfig() (*Config, error) {
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", ""),
 		},
-		// Email 和 Upload 配置由 SettingService.ApplyDatabaseConfig() 从数据库加载
-	}
-
-	// 验证必需的配置
-	if config.Database.Password == "" {
-		return nil, fmt.Errorf("DB_PASSWORD 环境变量未设置")
-	}
-	if config.JWT.Secret == "" {
-		return nil, fmt.Errorf("JWT_SECRET 环境变量未设置")
 	}
 
 	return config, nil
+}
+
+// IsSetupNeeded 检查是否需要首次安装配置
+func (c *Config) IsSetupNeeded() bool {
+	return c.Database.Password == "" || c.JWT.Secret == ""
 }
 
 // getEnv 获取环境变量，如果不存在则返回默认值

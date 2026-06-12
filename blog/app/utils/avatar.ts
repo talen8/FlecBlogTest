@@ -9,9 +9,9 @@ export function getAvatarUrl(user: { avatar?: string; email_hash?: string }, siz
   }
   let cravatarUrl = DEFAULT_CRAVATAR_URL;
   try {
-    const { blogConfig } = useSysConfig();
-    if (blogConfig.value.cravatar_url) {
-      cravatarUrl = blogConfig.value.cravatar_url;
+    const { basicConfig } = useSysConfig();
+    if (basicConfig.value.cravatar_url) {
+      cravatarUrl = basicConfig.value.cravatar_url;
     }
   } catch {
     // useSysConfig 可能在非 Nuxt 上下文中调用，使用默认值

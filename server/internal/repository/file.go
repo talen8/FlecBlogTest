@@ -156,6 +156,13 @@ func (r *FileRepository) UpdateFileStatusByUrls(urls []string, status int) error
 		Update("status", status).Error
 }
 
+// MarkUnusedByUploadType 将指定 upload_type 的文件批量标记为未使用
+func (r *FileRepository) MarkUnusedByUploadType(uploadType string) error {
+	return r.db.Model(&model.File{}).
+		Where("upload_type = ? AND status = ?", uploadType, 1).
+		Update("status", 0).Error
+}
+
 // ============ 维护方法 ============
 
 // GetUnusedFiles 获取超过指定天数未使用的文件

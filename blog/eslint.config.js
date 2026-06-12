@@ -3,4 +3,10 @@ import eslintPluginPrettier from 'eslint-plugin-prettier/recommended';
 
 export default createConfigForNuxt({
   // Nuxt 项目配置
-}).append(eslintPluginPrettier);
+})
+  .append(eslintPluginPrettier)
+  .override('nuxt/vue/rules', {
+    rules: {
+      'vue/multi-word-component-names': 'off',
+    },
+  });

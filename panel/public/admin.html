@@ -104,7 +104,7 @@
 
     .stats {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 16px;
       margin-bottom: 24px;
     }
@@ -276,6 +276,46 @@
 
     .modal-body {
       padding: 20px;
+      max-height: 65vh;
+      overflow-y: auto;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #ccc;
+      border-radius: 22px;
+      transition: 0.2s;
+    }
+    .switch .slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 2px;
+      bottom: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .switch input:checked + .slider {
+      background: #52c41a;
+    }
+    .switch input:checked + .slider::before {
+      transform: translateX(18px);
     }
 
     .modal-foot {
@@ -321,6 +361,54 @@
       color: #999;
     }
 
+    .upload-area {
+      border: 2px dashed #d9d9d9;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .upload-area:hover {
+      border-color: #1890ff;
+      background: rgba(24, 144, 255, 0.03);
+    }
+
+    .upload-area.has-image {
+      border-color: #52c41a;
+      padding: 6px;
+    }
+
+    .upload-placeholder {
+      color: #999;
+      font-size: 13px;
+    }
+
+    .upload-preview {
+      max-height: 140px;
+      border-radius: 4px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .upload-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      font-size: 13px;
+      cursor: pointer;
+      line-height: 22px;
+      text-align: center;
+    }
+
     @media (max-width: 768px) {
       .sidebar { display: none; }
       .main { margin-left: 0; }
@@ -344,6 +432,8 @@
         <div class="nav-item active" onclick="showPage('dashboard')">仪表盘</div>
         <div class="nav-item" onclick="showPage('versions')">版本管理</div>
         <div class="nav-item" onclick="showPage('announcements')">公告管理</div>
+        <div class="nav-item" onclick="showPage('themes')">主题管理</div>
+        <div class="nav-item" onclick="showPage('premium')">激活码</div>
         <div class="nav-item" onclick="showPage('settings')">系统设置</div>
       </nav>
     </aside>
@@ -368,6 +458,10 @@
             <div class="stat-item">
               <div class="stat-value" id="statAnnouncements">-</div>
               <div class="stat-label">公告</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="statThemes">-</div>
+              <div class="stat-label">主题</div>
             </div>
           </div>
           <div class="card" style="margin-bottom: 24px;">
@@ -414,6 +508,37 @@
             <table>
               <thead><tr><th>标题</th><th>内容</th><th>链接</th><th>时间</th><th>操作</th></tr></thead>
               <tbody id="annList"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Themes -->
+        <div id="themesPage" class="hidden">
+          <div style="margin-bottom: 16px;">
+            <button class="btn btn-primary" onclick="openThemeModal()">创建主题</button>
+          </div>
+          <div class="card">
+            <table>
+              <thead><tr><th>预览</th><th>Slug</th><th>名称</th><th>作者</th><th>版本</th><th>分类</th><th>来源</th><th>下载</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="themeList"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Premium -->
+        <div id="premiumPage" class="hidden">
+          <div style="margin-bottom: 16px; display: flex; gap: 12px;">
+            <button class="btn btn-primary" onclick="openGenerateModal()">批量生成</button>
+            <select id="premiumFilterStatus" class="form-input" style="width:120px" onchange="loadPremiumCodes()">
+              <option value="">全部状态</option>
+              <option value="unused">未使用</option>
+              <option value="used">已使用</option>
+            </select>
+          </div>
+          <div class="card">
+            <table>
+              <thead><tr><th>激活码</th><th>天数</th><th>状态</th><th>激活时间</th><th>创建时间</th><th>操作</th></tr></thead>
+              <tbody id="premiumList"></tbody>
             </table>
           </div>
         </div>
@@ -498,6 +623,136 @@
     </div>
   </div>
 
+  <!-- Theme Modal -->
+  <div id="themeModal" class="modal-mask hidden">
+    <div class="modal" style="max-width: 680px;">
+      <div class="modal-head">
+        <h3 id="themeModalTitle">创建主题</h3>
+        <button class="modal-close" onclick="closeModal('themeModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="themeOriginalSlug">
+        <div style="display:flex;gap:12px">
+          <div class="form-item" style="flex:1">
+            <label class="form-label">Slug <span style="color:#ff4d4f">*</span></label>
+            <input type="text" id="themeSlug" class="form-input" placeholder="my-theme">
+          </div>
+          <div class="form-item" style="flex:1">
+            <label class="form-label">名称 <span style="color:#ff4d4f">*</span></label>
+            <input type="text" id="themeName" class="form-input" placeholder="我的主题">
+          </div>
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="form-item" style="flex:1">
+            <label class="form-label">作者</label>
+            <input type="text" id="themeAuthor" class="form-input" placeholder="作者名">
+          </div>
+          <div class="form-item" style="flex:1">
+            <label class="form-label">来源</label>
+            <select id="themeSource" class="form-input">
+              <option value="community">社区主题</option>
+              <option value="official">官方主题</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-item">
+          <label class="form-label">描述</label>
+          <textarea id="themeDescription" class="form-input" style="min-height:50px;resize:vertical" placeholder="主题描述"></textarea>
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="form-item" style="flex:1">
+            <label class="form-label">分类</label>
+            <input type="text" id="themeCategory" class="form-input" placeholder="blog / portfolio / docs">
+          </div>
+          <div class="form-item" style="flex:none">
+            <label class="form-label" style="margin-bottom:10px;display:block">是否启用</label>
+            <label class="switch" style="margin-top:2px">
+              <input type="checkbox" id="themeEnabled" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-item" style="flex:none">
+            <label class="form-label" style="margin-bottom:10px;display:block">付费主题</label>
+            <label class="switch" style="margin-top:2px">
+              <input type="checkbox" id="themePremium">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="form-item" style="flex:1">
+            <label class="form-label">仓库地址 <span style="color:#ff4d4f">*</span></label>
+            <input type="text" id="themeRepoUrl" class="form-input" placeholder="https://github.com/user/repo">
+          </div>
+          <div class="form-item" style="flex:1">
+            <label class="form-label">演示地址</label>
+            <input type="text" id="themeDemoUrl" class="form-input" placeholder="https://...">
+          </div>
+        </div>
+        <div class="form-item">
+          <label class="form-label">预览图</label>
+          <div class="upload-area" onclick="document.getElementById('themePreviewInput').click()" style="padding:12px">
+            <input type="file" id="themePreviewInput" accept="image/png,image/jpeg,image/webp,image/gif" onchange="handleAdminPreviewSelect(event)" style="display:none">
+            <div id="adminUploadPlaceholder" class="upload-placeholder" style="font-size:13px">
+              点击上传
+            </div>
+            <img id="adminUploadPreview" class="upload-preview" style="display:none">
+            <button type="button" class="upload-remove" id="adminUploadRemove" style="display:none" onclick="removeAdminPreview(event)">×</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('themeModal')">取消</button>
+        <button class="btn btn-primary" onclick="saveTheme()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate Codes Modal -->
+  <div id="generateModal" class="modal-mask hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>批量生成激活码</h3>
+        <button class="modal-close" onclick="closeModal('generateModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-item">
+          <label class="form-label">天数（-1 = 永久）</label>
+          <input type="number" id="genDays" class="form-input" placeholder="例如：30、365、-1" min="-1">
+        </div>
+        <div class="form-item">
+          <label class="form-label">生成数量</label>
+          <input type="number" id="genCount" class="form-input" value="10" min="1" max="500">
+          <div class="form-hint">单次最多 500 个</div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('generateModal')">取消</button>
+        <button class="btn btn-primary" onclick="generateCodes()">生成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generated Codes Modal -->
+  <div id="generatedCodesModal" class="modal-mask hidden">
+    <div class="modal" style="max-width: 560px;">
+      <div class="modal-head">
+        <h3>生成成功</h3>
+        <button class="modal-close" onclick="closeModal('generatedCodesModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+          <span id="generatedCodesCount" style="font-size: 14px; color: #666;"></span>
+          <button class="btn btn-sm" onclick="copyGeneratedCodes()">复制全部</button>
+        </div>
+        <textarea id="generatedCodesText" class="form-input" style="min-height: 240px; font-family: monospace; font-size: 13px; line-height: 1.6;" readonly></textarea>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-primary" onclick="closeModal('generatedCodesModal')">完成</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="toast"></div>
 
@@ -533,14 +788,16 @@
       document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
       event.target.classList.add('active');
 
-      const pages = ['dashboard', 'versions', 'announcements', 'settings'];
-      const titles = { dashboard: '仪表盘', versions: '版本管理', announcements: '公告管理', settings: '系统设置' };
+      const pages = ['dashboard', 'versions', 'announcements', 'themes', 'premium', 'settings'];
+      const titles = { dashboard: '仪表盘', versions: '版本管理', announcements: '公告管理', themes: '主题管理', premium: '激活码', settings: '系统设置' };
 
       pages.forEach(p => document.getElementById(p + 'Page').classList.toggle('hidden', p !== page));
       document.getElementById('pageTitle').textContent = titles[page];
 
       if (page === 'versions') loadVersions();
       if (page === 'announcements') loadAnnouncements();
+      if (page === 'themes') loadThemes();
+      if (page === 'premium') loadPremiumCodes();
       if (page === 'settings') loadSettings();
       if (page === 'dashboard') loadDashboard();
     }
@@ -550,17 +807,20 @@
      */
     async function loadDashboard() {
       try {
-        const [vRes, aRes] = await Promise.all([
+        const [vRes, aRes, tRes] = await Promise.all([
           fetch('/admin/versions?all=true'),
-          fetch('/admin/announcements')
+          fetch('/admin/announcements'),
+          fetch('/admin/themes')
         ]);
 
         const versions = (await vRes.json()).versions || [];
         const announcements = (await aRes.json()).announcements || [];
+        const themes = await tRes.json();
 
         document.getElementById('statVersions').textContent = versions.length;
         document.getElementById('statEnabled').textContent = versions.filter(v => v.enabled).length;
         document.getElementById('statAnnouncements').textContent = announcements.length;
+        document.getElementById('statThemes').textContent = Array.isArray(themes) ? themes.length : 0;
 
         const tbody = document.getElementById('dashboardVersionList');
         tbody.innerHTML = versions.slice(0, 5).map(v =>
@@ -576,6 +836,7 @@
         document.getElementById('statVersions').textContent = '-';
         document.getElementById('statEnabled').textContent = '-';
         document.getElementById('statAnnouncements').textContent = '-';
+        document.getElementById('statThemes').textContent = '-';
         document.getElementById('dashboardVersionList').innerHTML = '<tr><td colspan="3" class="empty">加载失败</td></tr>';
         document.getElementById('dashboardAnnouncementList').innerHTML = '<tr><td colspan="3" class="empty">加载失败</td></tr>';
       }
@@ -800,6 +1061,291 @@
       } else {
         showToast(data.error || '同步失败');
       }
+    }
+
+    // ============ 主题管理 ============
+
+    let editingThemeSlug = null;
+
+    async function loadThemes() {
+      try {
+        const res = await fetch('/admin/themes');
+        const themes = await res.json();
+        const tbody = document.getElementById('themeList');
+
+        if (!themes.length) {
+          tbody.innerHTML = '<tr><td colspan="10" class="empty">暂无主题</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = themes.map(t => {
+          const previewImg = t.preview_url
+            ? '<img src="' + escapeHtml(t.preview_url) + '" style="width:60px;height:40px;object-fit:cover;border-radius:4px;display:block">'
+            : '<span style="color:#999;font-size:12px">无</span>';
+          const isOfficial = t.source === 'official';
+          return '<tr>' +
+            '<td>' + previewImg + '</td>' +
+            '<td><code style="background:#f5f5f5;padding:2px 6px;border-radius:3px;">' + escapeHtml(t.slug) + '</code></td>' +
+            '<td>' + escapeHtml(t.name) + '</td>' +
+            '<td>' + escapeHtml(t.author || '-') + '</td>' +
+            '<td>v' + escapeHtml(t.version) + '</td>' +
+            '<td>' + escapeHtml(t.category || '-') + '</td>' +
+            '<td><span class="badge ' + (isOfficial ? 'badge-info' : 'badge-default') + '">' + (isOfficial ? '官方' : '社区') + '</span></td>' +
+            '<td>' + t.downloads + '</td>' +
+            '<td><span class="badge ' + (t.enabled ? 'badge-success' : 'badge-default') + '">' + (t.enabled ? '已启用' : '已禁用') + '</span></td>' +
+            '<td style="white-space:nowrap">' +
+              '<button class="btn btn-sm" onclick="editTheme(\'' + escapeHtml(t.slug) + '\')">编辑</button> ' +
+              '<button class="btn btn-sm" onclick="checkThemeRepo(\'' + escapeHtml(t.slug) + '\')">检查</button> ' +
+              '<button class="btn btn-sm btn-danger" onclick="deleteTheme(\'' + escapeHtml(t.slug) + '\')">删除</button>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+      } catch (e) {
+        document.getElementById('themeList').innerHTML = '<tr><td colspan="10" class="empty">加载失败</td></tr>';
+      }
+    }
+
+    function resetAdminPreview() {
+      document.getElementById('themePreviewInput').value = '';
+      document.getElementById('adminUploadPreview').style.display = 'none';
+      document.getElementById('adminUploadPlaceholder').style.display = '';
+      document.getElementById('adminUploadRemove').style.display = 'none';
+      document.querySelector('.upload-area').classList.remove('has-image');
+    }
+
+    function handleAdminPreviewSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        document.getElementById('adminUploadPreview').src = ev.target.result;
+        document.getElementById('adminUploadPreview').style.display = 'block';
+        document.getElementById('adminUploadPlaceholder').style.display = 'none';
+        document.getElementById('adminUploadRemove').style.display = '';
+        document.querySelector('.upload-area').classList.add('has-image');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeAdminPreview(e) {
+      e.stopPropagation();
+      resetAdminPreview();
+    }
+
+    function openThemeModal() {
+      editingThemeSlug = null;
+      document.getElementById('themeModalTitle').textContent = '创建主题';
+      document.getElementById('themeOriginalSlug').value = '';
+      document.getElementById('themeSlug').value = '';
+      document.getElementById('themeSlug').disabled = false;
+      document.getElementById('themeName').value = '';
+      document.getElementById('themeAuthor').value = '';
+      document.getElementById('themeDescription').value = '';
+      document.getElementById('themeCategory').value = '';
+      document.getElementById('themeSource').value = 'community';
+      document.getElementById('themeRepoUrl').value = '';
+      document.getElementById('themeDemoUrl').value = '';
+      document.getElementById('themeEnabled').checked = true;
+      document.getElementById('themePremium').checked = false;
+      resetAdminPreview();
+      openModal('themeModal');
+    }
+
+    function editTheme(slug) {
+      editingThemeSlug = slug;
+      document.getElementById('themeModalTitle').textContent = '编辑主题';
+
+      fetch('/admin/themes/' + encodeURIComponent(slug))
+        .then(r => r.json())
+        .then(theme => {
+          document.getElementById('themeOriginalSlug').value = slug;
+          document.getElementById('themeSlug').value = theme.slug;
+          document.getElementById('themeSlug').disabled = true;
+          document.getElementById('themeName').value = theme.name || '';
+          document.getElementById('themeAuthor').value = theme.author || '';
+          document.getElementById('themeDescription').value = theme.description || '';
+          document.getElementById('themeCategory').value = theme.category || '';
+          document.getElementById('themeSource').value = theme.source || 'community';
+          document.getElementById('themeRepoUrl').value = theme.repo_url || '';
+          document.getElementById('themeDemoUrl').value = theme.demo_url || '';
+          document.getElementById('themeEnabled').checked = theme.enabled !== false;
+          document.getElementById('themePremium').checked = theme.premium_required === true;
+          openModal('themeModal');
+        })
+        .catch(() => showToast('获取主题详情失败'));
+    }
+
+    async function saveTheme() {
+      const slug = document.getElementById('themeSlug').value.trim();
+      const name = document.getElementById('themeName').value.trim();
+      const repoUrl = document.getElementById('themeRepoUrl').value.trim();
+
+      if (!slug) return showToast('请填写 Slug');
+      if (!name) return showToast('请填写名称');
+      if (!repoUrl) return showToast('请填写仓库地址');
+
+      const isEdit = !!editingThemeSlug;
+      const previewFile = document.getElementById('themePreviewInput').files[0];
+
+      // 编辑或用 JSON（无文件）
+      if (isEdit || !previewFile) {
+        const body = {
+          slug, name, repo_url: repoUrl,
+          author: document.getElementById('themeAuthor').value.trim(),
+          description: document.getElementById('themeDescription').value.trim(),
+          category: document.getElementById('themeCategory').value.trim(),
+          source: document.getElementById('themeSource').value,
+          demo_url: document.getElementById('themeDemoUrl').value.trim(),
+          enabled: document.getElementById('themeEnabled').checked,
+          premium_required: document.getElementById('themePremium').checked,
+        };
+
+        try {
+          const url = isEdit ? '/admin/themes/' + encodeURIComponent(editingThemeSlug) : '/admin/themes';
+          const res = await fetch(url, {
+            method: isEdit ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          if (data.success) {
+            closeModal('themeModal');
+            loadThemes();
+            showToast(isEdit ? '已更新' : '已创建');
+          } else {
+            showToast(data.error || '操作失败');
+          }
+        } catch (e) {
+          showToast('操作失败');
+        }
+        return;
+      }
+
+      // 创建 + 上传图片（用 FormData）
+      const formData = new FormData();
+      formData.append('slug', slug);
+      formData.append('name', name);
+      formData.append('repo_url', repoUrl);
+      formData.append('author', document.getElementById('themeAuthor').value.trim());
+      formData.append('description', document.getElementById('themeDescription').value.trim());
+      formData.append('category', document.getElementById('themeCategory').value.trim());
+      formData.append('source', document.getElementById('themeSource').value);
+      formData.append('demo_url', document.getElementById('themeDemoUrl').value.trim());
+      formData.append('enabled', document.getElementById('themeEnabled').checked ? 'true' : 'false');
+      formData.append('premium_required', document.getElementById('themePremium').checked ? 'true' : 'false');
+      formData.append('preview', previewFile);
+
+      try {
+        const res = await fetch('/admin/themes', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('themeModal');
+          loadThemes();
+          showToast('已创建');
+        } else {
+          showToast(data.error || '操作失败');
+        }
+      } catch (e) {
+        showToast('操作失败');
+        console.error('saveTheme error:', e);
+      }
+    }
+
+    async function checkThemeRepo(slug) {
+      try {
+        const res = await fetch('/admin/themes/' + encodeURIComponent(slug) + '/check');
+        const data = await res.json();
+        if (data.ok) {
+          showToast('仓库可用，版本: v' + (data.version || '未知'));
+        } else {
+          showToast(data.error || '仓库不可用', 'error');
+        }
+      } catch (e) {
+        showToast('检查失败', 'error');
+      }
+    }
+
+    // ============ 激活码管理 ============
+
+    async function loadPremiumCodes() {
+      try {
+        const status = document.getElementById('premiumFilterStatus').value;
+        const params = new URLSearchParams();
+        if (status) params.set('status', status);
+
+        const res = await fetch('/admin/premium/codes?' + params);
+        const data = await res.json();
+        const tbody = document.getElementById('premiumList');
+
+        if (!data.codes || !data.codes.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty">暂无激活码</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.codes.map(c => {
+          const daysLabel = c.days === -1 ? '永久' : c.days;
+          return '<tr>' +
+            '<td><code style="background:#f5f5f5;padding:2px 6px;border-radius:3px;font-size:12px">' + escapeHtml(c.code) + '</code></td>' +
+            '<td>' + daysLabel + '</td>' +
+            '<td><span class="badge ' + (c.status === 'used' ? 'badge-default' : 'badge-success') + '">' + (c.status === 'used' ? '已使用' : '未使用') + '</span></td>' +
+            '<td>' + (c.start_time || '-') + '</td>' +
+            '<td>' + (c.created_at || '-') + '</td>' +
+            '<td>-</td>' +
+          '</tr>';
+        }).join('');
+      } catch (e) {
+        document.getElementById('premiumList').innerHTML = '<tr><td colspan="6" class="empty">加载失败</td></tr>';
+      }
+    }
+
+    function openGenerateModal() {
+      document.getElementById('genDays').value = '';
+      document.getElementById('genCount').value = '10';
+      openModal('generateModal');
+    }
+
+    async function generateCodes() {
+      const days = parseInt(document.getElementById('genDays').value);
+      const count = parseInt(document.getElementById('genCount').value);
+
+      if ((!days && days !== 0) || (days !== -1 && days <= 0)) {
+        showToast('请输入有效的天数（-1 = 永久）');
+        return;
+      }
+      if (!count || count < 1) {
+        showToast('请输入有效的数量');
+        return;
+      }
+
+      const body = { days, count };
+
+      try {
+        const res = await fetch('/admin/premium/codes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('generateModal');
+          document.getElementById('generatedCodesCount').textContent = '共 ' + data.count + ' 个激活码';
+          document.getElementById('generatedCodesText').value = data.codes.join('\n');
+          openModal('generatedCodesModal');
+          loadPremiumCodes();
+        } else {
+          showToast(data.error || '生成失败');
+        }
+      } catch (e) {
+        showToast('生成失败');
+      }
+    }
+
+    function copyGeneratedCodes() {
+      const textarea = document.getElementById('generatedCodesText');
+      textarea.select();
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        showToast('已复制到剪贴板');
+      });
     }
 
     // 初始化

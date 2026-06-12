@@ -1,57 +1,20 @@
-import { getArticlesForWeb } from '@/composables/api/article';
 import { getComments, createComment, deleteComment } from '@/composables/api/comment';
-import { flattenComments } from '@/composables/useComment';
-import { getMoments } from '@/composables/api/moment';
 import { getNotifications, markAsRead, markAllAsRead } from '@/composables/api/notification';
 import { getCategories } from '@/composables/api/category';
 import { getTags } from '@/composables/api/tag';
-import type { Article, ArticleQuery } from '@@/types/article';
+import { getArticlesForWeb } from '@/composables/api/article';
+import { getSiteStats, getArchiveStats } from '@/composables/api/stats';
+import type { Article } from '@@/types/article';
 import type { Category } from '@@/types/category';
 import type { Comment, CreateCommentParams, CommentTargetType } from '@@/types/comment';
-import type { Menu } from '@@/types/menu';
-import type { Moment } from '@@/types/moment';
+import type { Menu } from '@@/types/theme';
 import type { Notification, GetNotificationsParams } from '@@/types/notification';
-import type { SiteStats } from '@@/types/stats';
+import type { ArchiveItem, SiteStats } from '@@/types/stats';
 import type { Tag } from '@@/types/tag';
 
-export function useArticles() {
-  const articles = useState<Article[]>('articles', () => []);
-  const total = useState<number>('articles-total', () => 0);
-  const currentPage = useState<number>('articles-currentPage', () => 1);
-  const pageSize = useState<number>('articles-pageSize', () => 10);
-
-  const fetchArticles = async (query: ArticleQuery = {}, forceRefresh = false) => {
-    if (query.page) currentPage.value = query.page;
-    if (!forceRefresh && articles.value.length && !Object.keys(query).length) return;
-
-    try {
-      const { list, total: resTotal } = await getArticlesForWeb({
-        page: currentPage.value,
-        page_size: pageSize.value,
-        ...query,
-      });
-      articles.value = list || [];
-      total.value = resTotal || 0;
-    } catch (error) {
-      console.error('获取文章列表失败:', error);
-      articles.value = [];
-      total.value = 0;
-    }
-  };
-
-  return {
-    articles,
-    total,
-    currentPage,
-    pageSize,
-    fetchArticles,
-    setPageSize: (size: number) => {
-      pageSize.value = size;
-      currentPage.value = 1;
-    },
-    resetPage: () => (currentPage.value = 1),
-  };
-}
+// ============================================================
+// 文章状态
+// ============================================================
 
 export function useCurrentArticle() {
   const currentArticle = useState<Article | null>('currentArticle', () => null);
@@ -63,32 +26,96 @@ export function useCurrentArticle() {
   };
 }
 
+// ============================================================
+// 分类
+// ============================================================
+
 export function useCategories() {
   const categories = useState<Category[]>('categories', () => []);
   const total = useState<number>('categories-total', () => 0);
+  const loading = ref(false);
+  const error = ref<Error | null>(null);
 
   const fetchCategories = async (forceRefresh = false) => {
     if (!forceRefresh && categories.value.length) return;
 
+    loading.value = true;
+    error.value = null;
     try {
       const { list, total: resTotal } = await getCategories();
       categories.value = list || [];
       total.value = resTotal || 0;
-    } catch (error) {
-      console.error('获取分类列表失败:', error);
+    } catch (e) {
+      console.error('获取分类列表失败:', e);
+      error.value = e instanceof Error ? e : new Error(String(e));
       categories.value = [];
       total.value = 0;
+    } finally {
+      loading.value = false;
     }
   };
 
-  return { categories, total, fetchCategories };
+  return { categories, total, loading, error, fetchCategories };
 }
+
+// ============================================================
+// 标签
+// ============================================================
+
+export function useTags() {
+  const tags = useState<Tag[]>('tags', () => []);
+  const total = useState<number>('tags-total', () => 0);
+  const loading = ref(false);
+  const error = ref<Error | null>(null);
+
+  const fetchTags = async (forceRefresh = false) => {
+    if (!forceRefresh && tags.value.length) return;
+
+    loading.value = true;
+    error.value = null;
+    try {
+      const { list, total: resTotal } = await getTags();
+      tags.value = list || [];
+      total.value = resTotal || 0;
+    } catch (e) {
+      console.error('获取标签列表失败:', e);
+      error.value = e instanceof Error ? e : new Error(String(e));
+      tags.value = [];
+      total.value = 0;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  return { tags, total, loading, error, fetchTags };
+}
+
+// ============================================================
+// 菜单
+// ============================================================
+
+export function useMenus() {
+  const menus = useState<Record<string, Menu[]>>('menus', () => ({}));
+
+  const filterByKey = (key: string) => (menus.value[key] || []).sort((a, b) => a.sort - b.sort);
+
+  return {
+    menus,
+    filterByKey,
+  };
+}
+
+// ============================================================
+// 评论
+// ============================================================
 
 export function useComments() {
   const comments = useState<Comment[]>('comments', () => []);
   const currentTargetType = useState<CommentTargetType | null>('comments-targetType', () => null);
   const currentTargetKey = useState<string | number | null>('comments-targetKey', () => null);
   const { articles } = useArticles();
+  const loading = ref(false);
+  const error = ref<Error | null>(null);
 
   const fetchComments = async (targetType: CommentTargetType, targetKey: string | number) => {
     if (!targetType || !targetKey) return;
@@ -96,15 +123,20 @@ export function useComments() {
     currentTargetType.value = targetType;
     currentTargetKey.value = targetKey;
 
+    loading.value = true;
+    error.value = null;
     try {
       const data = await getComments({
         target_type: targetType,
         target_key: targetKey,
       });
       comments.value = data.list || [];
-    } catch (error) {
-      console.error('获取评论失败:', error);
+    } catch (e) {
+      console.error('获取评论失败:', e);
+      error.value = e instanceof Error ? e : new Error(String(e));
       comments.value = [];
+    } finally {
+      loading.value = false;
     }
   };
 
@@ -128,13 +160,11 @@ export function useComments() {
       addReplyToComment(comments.value);
     }
 
-    // 更新首页文章列表中的评论数量
     if (params.target_type === 'article') {
       const article = articles.value.find(a => a.slug === params.target_key);
       if (article) {
         article.comment_count = (article.comment_count || 0) + 1;
       }
-      // 刷新首页的SSR缓存数据
       refreshNuxtData('articles-list');
     }
 
@@ -168,6 +198,8 @@ export function useComments() {
 
   return {
     comments,
+    loading,
+    error,
     fetchComments,
     addComment,
     removeComment,
@@ -180,57 +212,9 @@ export function useComments() {
   };
 }
 
-export function useMenus() {
-  const menus = useState<Menu[]>('menus', () => []);
-
-  const filterByType = (type: string) =>
-    menus.value.filter(menu => menu.type === type).sort((a, b) => a.sort - b.sort);
-
-  return {
-    menus,
-    navigationMenus: computed(() => filterByType('navigation')),
-    footerMenus: computed(() => filterByType('footer')),
-    aggregateMenus: computed(() => filterByType('aggregate')),
-  };
-}
-
-export function useMoments() {
-  const moments = useState<Moment[]>('moments', () => []);
-  const total = useState<number>('moments-total', () => 0);
-  const currentPage = useState<number>('moments-currentPage', () => 1);
-  const { blogConfig } = useSysConfig();
-  const pageSize = useState<number>('moments-pageSize', () => {
-    const configSize = parseInt(blogConfig.value['moments_size'] || '30');
-    return configSize > 0 ? configSize : 30;
-  });
-
-  const fetchMoments = async (page: number = 1, forceRefresh = false) => {
-    if (page) currentPage.value = page;
-    if (!forceRefresh && moments.value.length) return;
-
-    try {
-      const {
-        list,
-        total: resTotal,
-        page: resPage,
-        page_size: resPageSize,
-      } = await getMoments({
-        page: currentPage.value,
-        page_size: pageSize.value,
-      });
-      moments.value = list || [];
-      total.value = resTotal || 0;
-      currentPage.value = resPage || 1;
-      pageSize.value = resPageSize || 30;
-    } catch (error) {
-      console.error('获取动态列表失败:', error);
-      moments.value = [];
-      total.value = 0;
-    }
-  };
-
-  return { moments, total, currentPage, pageSize, fetchMoments };
-}
+// ============================================================
+// 通知
+// ============================================================
 
 export function useNotifications() {
   const notifications = useState<Notification[]>('notifications', () => []);
@@ -238,10 +222,12 @@ export function useNotifications() {
   const currentPage = useState<number>('notifications-currentPage', () => 1);
   const pageSize = useState<number>('notifications-pageSize', () => 10);
   const unreadCount = useState<number>('notifications-unreadCount', () => 0);
-  const loading = useState<boolean>('notifications-loading', () => false);
+  const loading = ref(false);
+  const error = ref<Error | null>(null);
 
   const fetchNotifications = async (params?: Partial<GetNotificationsParams>) => {
     loading.value = true;
+    error.value = null;
     try {
       const response = await getNotifications({
         page: params?.page ?? currentPage.value,
@@ -253,8 +239,9 @@ export function useNotifications() {
       if (params?.page) {
         currentPage.value = params.page;
       }
-    } catch (error) {
-      console.error('获取通知列表失败:', error);
+    } catch (e) {
+      console.error('获取通知列表失败:', e);
+      error.value = e instanceof Error ? e : new Error(String(e));
       notifications.value = [];
       total.value = 0;
       unreadCount.value = 0;
@@ -292,6 +279,23 @@ export function useNotifications() {
     }
   };
 
+  // 轮询逻辑
+  let _pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  const startPolling = (intervalMs = 30000) => {
+    stopPolling();
+    _pollTimer = setInterval(() => {
+      fetchNotifications({ page: 1, page_size: 1 });
+    }, intervalMs);
+  };
+
+  const stopPolling = () => {
+    if (_pollTimer) {
+      clearInterval(_pollTimer);
+      _pollTimer = null;
+    }
+  };
+
   return {
     notifications,
     total,
@@ -299,6 +303,7 @@ export function useNotifications() {
     pageSize,
     unreadCount,
     loading,
+    error,
     fetchNotifications,
     markNotificationAsRead,
     markAllNotificationsAsRead,
@@ -309,8 +314,14 @@ export function useNotifications() {
       currentPage.value = 1;
       unreadCount.value = 0;
     },
+    startPolling,
+    stopPolling,
   };
 }
+
+// ============================================================
+// 统计数据
+// ============================================================
 
 export function useStats() {
   const siteStats = useState<SiteStats>('siteStats', () => ({
@@ -331,65 +342,158 @@ export function useStats() {
     month_pageviews: 0,
   }));
 
-  return { siteStats };
+  const { data } = useAsyncData('site-stats', async () => {
+    try {
+      return await getSiteStats();
+    } catch {
+      return null;
+    }
+  });
+
+  const stats = computed<SiteStats>(() => ({
+    ...siteStats.value,
+    ...(data.value ?? {}),
+  }));
+
+  function formatNumber(value: string | number): string {
+    if (typeof value === 'string') return value;
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+    if (value >= 10000) return `${(value / 10000).toFixed(1)}w`;
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+    return `${value}`;
+  }
+
+  return { siteStats, stats, formatNumber };
 }
+
+export function useRunningDays(established?: string) {
+  const { basicConfig } = useSysConfig();
+  const startDate = computed(() => established || basicConfig.value.established || '2024-01-01');
+  const runningDays = computed(() => calcRunningDays(startDate.value));
+  return { runningDays };
+}
+
+export function useCounts() {
+  const {
+    data: articlesData,
+    pending: articlesPending,
+    error: articlesError,
+  } = useAsyncData('sidebar-articles-count', async () => {
+    try {
+      const { total } = await getArticlesForWeb({ page: 1, page_size: 1 });
+      return total || 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  const {
+    data: categoriesData,
+    pending: categoriesPending,
+    error: categoriesError,
+  } = useAsyncData('sidebar-categories-count', async () => {
+    try {
+      const { total } = await getCategories();
+      return total || 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  const {
+    data: tagsData,
+    pending: tagsPending,
+    error: tagsError,
+  } = useAsyncData('sidebar-tags-count', async () => {
+    try {
+      const { total } = await getTags();
+      return total || 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  const articlesTotal = computed(() => articlesData.value ?? 0);
+  const categoriesTotal = computed(() => categoriesData.value ?? 0);
+  const tagsTotal = computed(() => tagsData.value ?? 0);
+
+  const loading = computed(
+    () => articlesPending.value || categoriesPending.value || tagsPending.value
+  );
+  const error = computed(() => articlesError.value || categoriesError.value || tagsError.value);
+
+  return { articlesTotal, categoriesTotal, tagsTotal, loading, error };
+}
+
+interface DisplayArchive extends ArchiveItem {
+  displayText: string;
+  isEarlier: boolean;
+}
+
+export async function useArchiveStats() {
+  const archives = ref<ArchiveItem[]>([]);
+
+  const { data, pending, error } = await useAsyncData('archives-stats', async () => {
+    try {
+      const r = await getArchiveStats();
+      return r.archives || [];
+    } catch {
+      return [];
+    }
+  });
+  if (data.value) {
+    archives.value = data.value;
+  }
+
+  const displayArchives = computed<DisplayArchive[]>(() => {
+    const list: DisplayArchive[] = archives.value.slice(0, 6).map(a => ({
+      ...a,
+      displayText: `${a.year} ${a.month}`,
+      isEarlier: false,
+    }));
+    if (archives.value.length > 6) {
+      const earlierCount = archives.value.slice(6).reduce((s, a) => s + a.count, 0);
+      list.push({
+        year: '',
+        month: '',
+        displayText: '在此之前',
+        count: earlierCount,
+        isEarlier: true,
+      });
+    }
+    return list;
+  });
+
+  return { archives, displayArchives, loading: pending, error };
+}
+
+// ============================================================
+// 系统配置
+// ============================================================
 
 export function useSysConfig() {
   const basicConfig = useState<Record<string, string>>('sysconfig-basic', () => ({
     author: '',
-    author_email: '',
     author_desc: '',
     author_avatar: '',
-    author_photo: '',
     icp: '',
     police_record: '',
     admin_url: '',
     blog_url: '',
     home_url: '',
-  }));
-
-  const blogConfig = useState<Record<string, string>>('sysconfig-blog', () => ({
     title: 'FlecBLOG',
     subtitle: 'FlecBLOG',
-    slogan: '',
     description: '',
     keywords: '',
     established: '',
     favicon: '',
-    background_image: '',
-    screenshot: '',
-    announcement: '',
-    typing_texts: '',
-    sidebar_social: '',
-    footer_social: '',
-    about_describe: '',
-    about_describe_tips: '',
-    about_exhibition: '',
-    about_profile: '',
-    about_personality: '',
-    about_motto_main: '',
-    about_motto_sub: '',
-    about_socialize: '',
-    about_creation: '',
-    about_versions: '',
-    about_unions: '',
-    about_story: '',
+    emojis: '',
     custom_head: '',
     custom_body: '',
-    emojis: '',
-    font: '',
     meting_api: '',
     cravatar_url: '',
     ip_api_url: '',
     cover_maker_api: '',
-    moments_size: '30',
-    message_content: '',
-    home_layout: 'waterfall',
-    donation_methods: '',
-    theme_light_start: '06:00',
-    theme_dark_start: '18:00',
-    wechat_qrcode: '',
-    wechat_name: '',
   }));
 
   const oauthConfig = useState<Record<string, string>>('sysconfig-oauth', () => ({
@@ -405,31 +509,49 @@ export function useSysConfig() {
     max_file_size: '5',
   }));
 
+  function getString(key: string, fallback: string = ''): string {
+    const val = basicConfig.value[key];
+    return val !== undefined && val !== '' ? val : fallback;
+  }
+
+  function getNumber(key: string, fallback: number = 0): number {
+    const val = basicConfig.value[key];
+    if (val === undefined || val === '') return fallback;
+    const parsed = Number(val);
+    return isNaN(parsed) ? fallback : parsed;
+  }
+
+  function getBoolean(key: string, fallback: boolean = false): boolean {
+    const val = basicConfig.value[key];
+    if (val === undefined || val === '') return fallback;
+    return val === 'true';
+  }
+
+  function getArray<T = unknown>(key: string, fallback: T[] = []): T[] {
+    const val = basicConfig.value[key];
+    if (!val) return fallback;
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? (parsed as T[]) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function getOAuthBoolean(key: string, fallback: boolean = false): boolean {
+    const val = oauthConfig.value[key];
+    if (val === undefined || val === '') return fallback;
+    return val === 'true';
+  }
+
   return {
     basicConfig,
-    blogConfig,
     oauthConfig,
     uploadConfig,
+    getString,
+    getNumber,
+    getBoolean,
+    getArray,
+    getOAuthBoolean,
   };
-}
-
-export function useTags() {
-  const tags = useState<Tag[]>('tags', () => []);
-  const total = useState<number>('tags-total', () => 0);
-
-  const fetchTags = async (forceRefresh = false) => {
-    if (!forceRefresh && tags.value.length) return;
-
-    try {
-      const { list, total: resTotal } = await getTags();
-      tags.value = list || [];
-      total.value = resTotal || 0;
-    } catch (error) {
-      console.error('获取标签列表失败:', error);
-      tags.value = [];
-      total.value = 0;
-    }
-  };
-
-  return { tags, total, fetchTags };
 }

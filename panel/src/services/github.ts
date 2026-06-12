@@ -46,8 +46,9 @@ export async function syncGitHubReleases(env: Env): Promise<{ success: boolean; 
       version = version.substring(1);
 
       // 跳过非正式版本（alpha、beta、rc、pre 等）
-      const prereleasePattern = /-(alpha|beta|rc|pre|dev|snapshot|nightly)(\.\d+)?$/i;
-      if (prereleasePattern.test(version)) continue;
+      // TODO: 测试完成后恢复此过滤
+      // const prereleasePattern = /-(alpha|beta|rc|pre|dev|snapshot|nightly)(\.\d+)?$/i;
+      // if (prereleasePattern.test(version)) continue;
       const date = release.published_at.split('T')[0];
       const changes = parseReleaseBody(release.body || '');
 
@@ -75,6 +76,112 @@ export async function autoEnablePendingVersions(env: Env): Promise<number> {
   ).run();
 
   return result.meta?.changes || 0;
+}
+
+export async function syncThemeVersions(env: Env): Promise<{ success: boolean; count: number; errors: string[] }> {
+  const themes = await env.DB.prepare('SELECT slug, repo_url FROM themes WHERE repo_url != ""').all<{ slug: string; repo_url: string }>();
+  let count = 0;
+  const errors: string[] = [];
+
+  for (const theme of themes.results) {
+    try {
+      const match = theme.repo_url.match(/github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?$/);
+      if (!match) continue;
+
+      const [, owner, repo] = match;
+      const url = `https://raw.githubusercontent.com/${owner}/${repo}/main/theme.config.json`;
+      const res = await fetch(url);
+
+      // 部分仓库默认分支不是 main
+      let config: { version?: string } | null = null;
+      if (res.ok) {
+        config = await res.json();
+      } else {
+        const fallback = `https://raw.githubusercontent.com/${owner}/${repo}/master/theme.config.json`;
+        const fallbackRes = await fetch(fallback);
+        if (fallbackRes.ok) {
+          config = await fallbackRes.json();
+        }
+      }
+
+      if (config?.version) {
+        await env.DB.prepare("UPDATE themes SET version = ?, updated_at = datetime('now') WHERE slug = ?")
+          .bind(config.version, theme.slug)
+          .run();
+        count++;
+      }
+    } catch (e) {
+      errors.push(`${theme.slug}: ${e instanceof Error ? e.message : '未知错误'}`);
+    }
+  }
+
+  return { success: true, count, errors };
+}
+
+/**
+ * 同步主题 ZIP 到 R2
+ * 从 GitHub 下载仓库 archive 原样存入 R2，更新 D1 的 zip_key 和 zip_updated_at
+ */
+export async function syncThemeZips(env: Env): Promise<{ success: boolean; count: number; errors: string[] }> {
+  if (!env.THEME_ASSETS) {
+    return { success: false, count: 0, errors: ['R2 未配置'] };
+  }
+
+  const themes = await env.DB.prepare(
+    "SELECT slug, repo_url FROM themes WHERE enabled = 1 AND repo_url != ''"
+  ).all<{ slug: string; repo_url: string }>();
+
+  let count = 0;
+  const errors: string[] = [];
+  const githubToken = await getSetting(env, 'github_token');
+
+  for (const theme of themes.results) {
+    try {
+      const match = theme.repo_url.match(/github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?$/);
+      if (!match) continue;
+
+      const [, owner, repo] = match;
+      const headers: Record<string, string> = {
+        'User-Agent': 'FlecPanel/1.0',
+      };
+      if (githubToken) {
+        headers['Authorization'] = `Bearer ${githubToken}`;
+      }
+
+      // 尝试 main 分支，失败则尝试 master
+      let archiveUrl = `https://api.github.com/repos/${owner}/${repo}/zipball/main`;
+      let res = await fetch(archiveUrl, { redirect: 'follow', headers });
+
+      if (!res.ok) {
+        archiveUrl = `https://api.github.com/repos/${owner}/${repo}/zipball/master`;
+        res = await fetch(archiveUrl, { redirect: 'follow', headers });
+      }
+
+      if (!res.ok) {
+        errors.push(`${theme.slug}: 下载失败 (${res.status})`);
+        continue;
+      }
+
+      const zipData = await res.arrayBuffer();
+      const r2Key = `themes/${theme.slug}.zip`;
+
+      await env.THEME_ASSETS.put(r2Key, zipData, {
+        httpMetadata: { contentType: 'application/zip' },
+      });
+
+      await env.DB.prepare(
+        "UPDATE themes SET zip_key = ?, zip_updated_at = datetime('now'), updated_at = datetime('now') WHERE slug = ?"
+      )
+        .bind(r2Key, theme.slug)
+        .run();
+
+      count++;
+    } catch (e) {
+      errors.push(`${theme.slug}: ${e instanceof Error ? e.message : '未知错误'}`);
+    }
+  }
+
+  return { success: true, count, errors };
 }
 
 function parseReleaseBody(body: string): string {

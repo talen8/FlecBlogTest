@@ -65,16 +65,17 @@
             <el-option label="友情链接S" value="友情链接S" />
           </el-option-group>
           <el-option-group label="系统板块">
-            <el-option label="菜单图标" value="菜单图标" />
             <el-option label="用户头像" value="用户头像" />
-          </el-option-group>
-          <el-option-group label="设置板块">
             <el-option label="博客图标" value="博客图标" />
-            <el-option label="博客背景" value="博客背景" />
-            <el-option label="博客截图" value="博客截图" />
-            <el-option label="展览图片" value="展览图片" />
             <el-option label="站长头像" value="站长头像" />
-            <el-option label="站长形象" value="站长形象" />
+          </el-option-group>
+          <el-option-group label="主题板块" v-if="themeList.length">
+            <el-option
+              v-for="theme in themeList"
+              :key="theme.name"
+              :label="theme.name"
+              :value="theme.name"
+            />
           </el-option-group>
         </el-select>
       </el-form-item>
@@ -118,6 +119,8 @@
 import { ref, watch, onMounted } from 'vue';
 import { Search } from '@element-plus/icons-vue';
 import FilterPanel from '@/components/common/FilterPanel.vue';
+import { getThemes } from '@/api/theme';
+import type { ThemeListItem } from '@/types/theme';
 import type { FileListQuery } from '@/types/file';
 
 /**
@@ -155,6 +158,9 @@ const emit = defineEmits<{
 const filterForm = ref<FileListQuery>({ ...props.modelValue });
 const dateRange = ref<[string, string] | null>(null);
 const sizeRange = ref<string | null>(null);
+
+/** 主题列表，用于动态生成「主题板块」上传用途选项 */
+const themeList = ref<Pick<ThemeListItem, 'name'>[]>([]);
 
 let isExternalUpdate = false;
 let isResetting = false;
@@ -240,9 +246,16 @@ const handleReset = () => {
   }, 100);
 };
 
-onMounted(() => {
+onMounted(async () => {
   if (filterForm.value.start_time && filterForm.value.end_time) {
     dateRange.value = [filterForm.value.start_time, filterForm.value.end_time];
+  }
+  // 拉取主题列表用于上传用途筛选
+  try {
+    const themes = await getThemes();
+    themeList.value = themes.map(t => ({ name: t.name }));
+  } catch {
+    // 静默失败，主题板块不显示
   }
 });
 </script>

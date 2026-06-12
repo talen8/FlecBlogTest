@@ -1,16 +1,7 @@
-import type { Comment, CommentTargetType } from '@@/types/comment';
+import type { Comment, CommentTargetType, FlatComment, GuestInfo } from '@@/types/comment';
 
-/**
- * 将树形评论结构递归转换为扁平数组
- * @param commentList 评论列表
- * @param depth 当前深度
- * @returns 扁平化的评论数组
- */
-export function flattenComments(
-  commentList: Comment[],
-  depth = 0
-): Array<{ comment: Comment; depth: number }> {
-  const result: Array<{ comment: Comment; depth: number }> = [];
+export function flattenComments(commentList: Comment[], depth = 0): FlatComment[] {
+  const result: FlatComment[] = [];
 
   commentList.forEach(comment => {
     result.push({ comment, depth });
@@ -22,32 +13,40 @@ export function flattenComments(
   return result;
 }
 
-/**
- * 游客信息类型
- */
-export interface GuestInfo {
-  nickname?: string;
-  email?: string;
-  website?: string;
+/** 将扁平评论列表按顶级评论分组 */
+export function groupFlatComments(
+  flatComments: FlatComment[]
+): Array<{ parent: FlatComment; replies: FlatComment[] }> {
+  const groups: Array<{ parent: FlatComment; replies: FlatComment[] }> = [];
+  let currentGroup: { parent: FlatComment; replies: FlatComment[] } | null = null;
+
+  flatComments.forEach(item => {
+    if (item.depth === 0) {
+      currentGroup = { parent: item, replies: [] };
+      groups.push(currentGroup);
+    } else if (currentGroup) {
+      currentGroup.replies.push(item);
+    }
+  });
+
+  return groups;
 }
 
-/**
- * 评论上下文类型定义
- */
+/** 递归计算嵌套评论总数（含回复） */
+export function countComments(list: Comment[]): number {
+  return list.reduce(
+    (total, c) => total + 1 + (c.replies?.length ? countComments(c.replies) : 0),
+    0
+  );
+}
+
 export interface CommentContext {
-  // 目标类型 (article/page)
   targetType: Ref<CommentTargetType>;
-  // 目标键值 (文章slug或页面key)
   targetKey: Ref<string | number>;
-  // 添加评论（顶层评论）
   addComment: (content: string, guestInfo?: GuestInfo) => Promise<void>;
-  // 添加回复
   addReply: (commentId: number, content: string, guestInfo?: GuestInfo) => Promise<void>;
-  // 删除评论
   deleteComment: (commentId: number) => Promise<void>;
-  // 显示登录模态框
   showLogin: () => void;
-  // 回复状态管理
   replyState: {
     replyingToId: Ref<number | null>;
     replyingToNickname: Ref<string>;
@@ -56,19 +55,12 @@ export interface CommentContext {
   };
 }
 
-// 注入键
 const CommentContextKey: InjectionKey<CommentContext> = Symbol('CommentContext');
 
-/**
- * 提供评论上下文
- */
 export function provideCommentContext(context: CommentContext) {
   provide(CommentContextKey, context);
 }
 
-/**
- * 注入评论上下文
- */
 export function useCommentContext() {
   const context = inject(CommentContextKey);
   if (!context) {
@@ -77,26 +69,75 @@ export function useCommentContext() {
   return context;
 }
 
-/**
- * 填充评论内容并滚动到评论区
- * @param content 要填充的内容
- */
 export async function fillComment(content: string) {
   const wrapper = document.querySelector('.comment-input');
   const textarea = wrapper?.querySelector('textarea') as HTMLTextAreaElement | null;
 
   if (!wrapper || !textarea) return;
 
-  // 先填充并调整高度
   textarea.value = content;
   textarea.dispatchEvent(new Event('input', { bubbles: true }));
 
-  // 等待浏览器完成重排（双帧确保稳定）
   await new Promise(resolve => {
     requestAnimationFrame(() => requestAnimationFrame(resolve));
   });
 
-  // 平滑滚动到评论区
   scrollToElement('.comment-input');
   textarea.focus();
+}
+
+// ============================================================
+// 评论本地存储
+// ============================================================
+
+const GUEST_INFO_KEY = 'guest_info';
+const COMMENT_DRAFT_KEY = 'comment_draft';
+
+/** 加载游客信息（客户端） */
+export function loadGuestInfo(): GuestInfo {
+  if (import.meta.server) return { nickname: '', email: '', website: '' };
+  try {
+    const stored = localStorage.getItem(GUEST_INFO_KEY);
+    if (stored) {
+      const saved = JSON.parse(stored);
+      return {
+        nickname: saved.nickname || '',
+        email: saved.email || '',
+        website: saved.website || '',
+      };
+    }
+  } catch {
+    // localStorage 数据可能损坏，回退到默认值
+  }
+  return { nickname: '', email: '', website: '' };
+}
+
+/** 保存游客信息（客户端） */
+export function saveGuestInfo(info: GuestInfo): void {
+  if (import.meta.client) {
+    localStorage.setItem(GUEST_INFO_KEY, JSON.stringify(info));
+  }
+}
+
+/** 加载评论草稿（客户端） */
+export function loadCommentDraft(): string {
+  if (import.meta.server) return '';
+  return localStorage.getItem(COMMENT_DRAFT_KEY) || '';
+}
+
+/** 保存评论草稿（客户端） */
+export function saveCommentDraft(content: string): void {
+  if (!import.meta.client) return;
+  if (content) {
+    localStorage.setItem(COMMENT_DRAFT_KEY, content);
+  } else {
+    localStorage.removeItem(COMMENT_DRAFT_KEY);
+  }
+}
+
+/** 清除评论草稿（客户端） */
+export function clearCommentDraft(): void {
+  if (import.meta.client) {
+    localStorage.removeItem(COMMENT_DRAFT_KEY);
+  }
 }

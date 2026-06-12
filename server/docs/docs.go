@@ -2637,254 +2637,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/menus": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "按类型获取菜单树",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单管理"
-                ],
-                "summary": "获取菜单树",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "菜单类型: aggregate/navigation/footer",
-                        "name": "type",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.MenuTreeNode"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "创建新的菜单项",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单管理"
-                ],
-                "summary": "创建菜单",
-                "parameters": [
-                    {
-                        "description": "菜单信息",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.MenuCreateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.MenuResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/menus/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "获取菜单项的详细信息",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单管理"
-                ],
-                "summary": "获取菜单详情",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "菜单ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.MenuResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "更新菜单项信息",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单管理"
-                ],
-                "summary": "更新菜单",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "菜单ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "菜单信息",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.MenuUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.MenuResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "硬删除菜单项，不可恢复",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单管理"
-                ],
-                "summary": "删除菜单",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "菜单ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "删除选项",
-                        "name": "request",
-                        "in": "body",
-                        "schema": {
-                            "$ref": "#/definitions/dto.MenuDeleteRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/admin/moments": {
             "get": {
                 "security": [
@@ -3543,7 +3295,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "basic",
-                            "blog",
                             "notification",
                             "upload",
                             "ai",
@@ -3610,7 +3361,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "basic",
-                            "blog",
                             "notification",
                             "upload",
                             "ai",
@@ -4139,6 +3889,82 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/system/upgrade": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "异步执行系统升级（blog/server/all），通过 status 端点轮询进度",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统管理"
+                ],
+                "summary": "系统升级",
+                "parameters": [
+                    {
+                        "description": "升级目标",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpgradeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/system/upgrade/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "轮询升级进度，status=done 或 status=idle 表示完成",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "系统管理"
+                ],
+                "summary": "查询升级进度",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.UpgradeStatus"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/admin/tags": {
             "get": {
                 "security": [
@@ -4453,6 +4279,634 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "获取所有已注册的主题",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "主题列表",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes/blog-rebuild-status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "主题切换/更新后触发 Blog 重建，前端轮询此接口获取进度",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "查询 Blog 重建状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes/install": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "从 ZIP 文件安装主题（主题市场内部调用）",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "安装主题",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "主题 ZIP 包（≤50MB）",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.ThemeInstallResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes/task-status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "获取当前正在进行的主题任务状态（安装/升级/激活/重建）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "获取任务状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.TaskStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes/{slug}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "获取指定主题的完整信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "主题详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "主题标识",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "删除指定的非激活主题（磁盘文件 + 数据库记录）",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "删除主题",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "主题标识",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes/{slug}/activate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "将指定主题设为激活状态",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "激活主题",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "主题标识",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.ThemeActivateResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes/{slug}/config": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新指定主题的配置",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "更新主题配置",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "主题标识",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "主题配置",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes/{slug}/market-install": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "从主题市场下载并安装指定主题",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "从市场安装主题",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "主题标识",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.ThemeInstallResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/themes/{slug}/menus": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "获取指定主题的菜单数据，支持按类型筛选",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "获取主题菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "主题标识",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "菜单类型",
+                        "name": "type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.MenuDataItem"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "整体替换指定主题某个类型的菜单列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题管理"
+                ],
+                "summary": "更新主题菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "主题标识",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "菜单数据",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.MenuUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/response.Response"
                         }
@@ -5117,6 +5571,93 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/premium/activate": {
+            "post": {
+                "description": "用户输入激活码，Server 调 Panel 验证后累加会员时间",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "会员"
+                ],
+                "summary": "激活会员",
+                "parameters": [
+                    {
+                        "description": "激活请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.PremiumActivateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.PremiumStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/premium/status": {
+            "get": {
+                "description": "获取当前站点的会员状态信息（包含完整字段，仅管理后台用）",
+                "tags": [
+                    "会员"
+                ],
+                "summary": "查询会员状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.PremiumStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/response.Response"
                         }
@@ -6972,51 +7513,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/menus": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单"
-                ],
-                "summary": "获取菜单树",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "菜单类型: aggregate/navigation/footer (不传则返回所有类型)",
-                        "name": "type",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.MenuTreeNode"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/moments": {
             "get": {
                 "description": "获取所有公开的动态",
@@ -7106,7 +7602,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "basic",
-                            "blog",
                             "notification",
                             "upload",
                             "ai",
@@ -7302,6 +7797,35 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/themes/active/schema": {
+            "get": {
+                "description": "获取当前激活主题的 schema 和 config（Blog 端使用）",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "主题"
+                ],
+                "summary": "获取激活主题 Schema 和 Config",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
                         }
                     },
                     "404": {
@@ -8994,104 +9518,13 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.MenuCreateRequest": {
-            "type": "object",
-            "required": [
-                "title",
-                "type"
-            ],
-            "properties": {
-                "icon": {
-                    "description": "图标",
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "is_enabled": {
-                    "description": "是否启用",
-                    "type": "boolean"
-                },
-                "parent_id": {
-                    "description": "父菜单ID，NULL表示主菜单",
-                    "type": "integer"
-                },
-                "sort": {
-                    "description": "排序，范围1-10",
-                    "type": "integer",
-                    "maximum": 10,
-                    "minimum": 1
-                },
-                "title": {
-                    "description": "菜单标题",
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                },
-                "type": {
-                    "description": "菜单类型",
-                    "type": "string",
-                    "enum": [
-                        "aggregate",
-                        "navigation",
-                        "footer"
-                    ]
-                },
-                "url": {
-                    "description": "链接地址（主菜单可为空）",
-                    "type": "string",
-                    "maxLength": 500
-                }
-            }
-        },
-        "dto.MenuDeleteRequest": {
-            "type": "object",
-            "properties": {
-                "children_action": {
-                    "description": "子菜单处理方式：delete-删除子菜单，upgrade-升级为主菜单",
-                    "type": "string",
-                    "enum": [
-                        "delete",
-                        "upgrade"
-                    ]
-                }
-            }
-        },
-        "dto.MenuResponse": {
-            "type": "object",
-            "properties": {
-                "icon": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "is_enabled": {
-                    "type": "boolean"
-                },
-                "parent_id": {
-                    "type": "integer"
-                },
-                "sort": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "url": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.MenuTreeNode": {
+        "dto.MenuDataItem": {
             "type": "object",
             "properties": {
                 "children": {
-                    "description": "子菜单列表",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.MenuTreeNode"
+                        "$ref": "#/definitions/dto.MenuDataItem"
                     }
                 },
                 "icon": {
@@ -9103,16 +9536,10 @@ const docTemplate = `{
                 "is_enabled": {
                     "type": "boolean"
                 },
-                "parent_id": {
-                    "type": "integer"
-                },
                 "sort": {
                     "type": "integer"
                 },
                 "title": {
-                    "type": "string"
-                },
-                "type": {
                     "type": "string"
                 },
                 "url": {
@@ -9123,48 +9550,19 @@ const docTemplate = `{
         "dto.MenuUpdateRequest": {
             "type": "object",
             "required": [
-                "title",
+                "items",
                 "type"
             ],
             "properties": {
-                "icon": {
-                    "description": "图标",
-                    "type": "string",
-                    "maxLength": 500
-                },
-                "is_enabled": {
-                    "description": "是否启用",
-                    "type": "boolean"
-                },
-                "parent_id": {
-                    "description": "父菜单ID",
-                    "type": "integer"
-                },
-                "sort": {
-                    "description": "排序",
-                    "type": "integer",
-                    "maximum": 10,
-                    "minimum": 1
-                },
-                "title": {
-                    "description": "菜单标题",
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.MenuDataItem"
+                    }
                 },
                 "type": {
-                    "description": "菜单类型",
                     "type": "string",
-                    "enum": [
-                        "aggregate",
-                        "navigation",
-                        "footer"
-                    ]
-                },
-                "url": {
-                    "description": "链接地址",
-                    "type": "string",
-                    "maxLength": 500
+                    "maxLength": 50
                 }
             }
         },
@@ -9377,6 +9775,32 @@ const docTemplate = `{
                 },
                 "type_text": {
                     "description": "类型中文文本（前端直接显示）",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PremiumActivateRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PremiumStatusResponse": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "days_remaining": {
+                    "description": "0=普通会员, -1=永久, \u003e0=剩余天数",
+                    "type": "integer"
+                },
+                "start_time": {
                     "type": "string"
                 }
             }
@@ -9654,6 +10078,9 @@ const docTemplate = `{
                 "app_version": {
                     "type": "string"
                 },
+                "build_official": {
+                    "type": "boolean"
+                },
                 "cpu_arch": {
                     "type": "string"
                 },
@@ -9733,6 +10160,57 @@ const docTemplate = `{
                 },
                 "name": {
                     "description": "标签名称",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.TaskStatusResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "progress": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ThemeActivateResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ThemeInstallResponse": {
+            "type": "object",
+            "properties": {
+                "is_active": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }
@@ -10012,6 +10490,44 @@ const docTemplate = `{
                 "website": {
                     "type": "string",
                     "maxLength": 255
+                }
+            }
+        },
+        "dto.UpgradeRequest": {
+            "type": "object",
+            "required": [
+                "target"
+            ],
+            "properties": {
+                "target": {
+                    "description": "blog | server | all",
+                    "type": "string",
+                    "enum": [
+                        "blog",
+                        "server",
+                        "all"
+                    ]
+                }
+            }
+        },
+        "dto.UpgradeStatus": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "description": "当前步骤描述或错误信息",
+                    "type": "string"
+                },
+                "progress": {
+                    "description": "0-100",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "idle | downloading | extracting | building | restarting | done | error",
+                    "type": "string"
+                },
+                "target": {
+                    "description": "blog | server | idle",
+                    "type": "string"
                 }
             }
         },

@@ -7,7 +7,9 @@ import { publicRoutes } from './routes/public';
 import { versionRoutes } from './routes/versions';
 import { announcementRoutes } from './routes/announcements';
 import { settingsRoutes } from './routes/settings';
-import { syncGitHubReleases, autoEnablePendingVersions } from './services/github';
+import { themeRoutes } from './routes/themes';
+import { premiumApiRoutes, premiumAdminRoutes } from './routes/premium';
+import { syncGitHubReleases, autoEnablePendingVersions, syncThemeVersions, syncThemeZips } from './services/github';
 
 type AppEnv = Env & { ASSETS: Fetcher };
 const app = new Hono<{ Bindings: AppEnv }>();
@@ -22,10 +24,14 @@ app.use(
 app.use('*', logger());
 
 app.route('/api', publicRoutes);
+app.route('/api/premium', premiumApiRoutes);
 app.route('/admin/versions', versionRoutes);
 app.route('/admin/announcements', announcementRoutes);
+app.route('/admin/themes', themeRoutes);
 app.route('/admin', settingsRoutes);
+app.route('/admin/premium', premiumAdminRoutes);
 
+app.get('/themes', async (c) => c.env.ASSETS.fetch(new URL('themes.html', c.req.url)));
 app.get('/admin', async (c) => c.env.ASSETS.fetch(new URL('admin.html', c.req.url)));
 
 export default {
@@ -33,5 +39,7 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env) {
     await syncGitHubReleases(env);
     await autoEnablePendingVersions(env);
+    await syncThemeVersions(env);
+    await syncThemeZips(env);
   },
 };

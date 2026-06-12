@@ -15,16 +15,7 @@ import (
 
 var reconciledSettingImageKeys = []string{
 	KeyBasicAuthorAvatar,
-	KeyBasicAuthorPhoto,
-	KeyBlogFavicon,
-	KeyBlogBackgroundImage,
-	KeyBlogAboutExhibition,
-	KeyBlogScreenshot,
-}
-
-// jsonArrayImageKeys 需要检查 JSON 数组中图片 URL 的配置键
-var jsonArrayImageKeys = map[string]string{
-	KeyBlogDonationMethods: "qrcode", // 赞赏方式，检查 qrcode 字段
+	KeyBasicFavicon,
 }
 
 // FileUsageChecker 文件引用检查器
@@ -33,8 +24,8 @@ type FileUsageChecker struct {
 	friendRepo   *repository.FriendRepository
 	momentRepo   *repository.MomentRepository
 	settingRepo  *repository.SettingRepository
+	themeRepo    *repository.ThemeRepository
 	userRepo     *repository.UserRepository
-	menuRepo     *repository.MenuRepository
 	feedbackRepo *repository.FeedbackRepository
 	commentRepo  *repository.CommentRepository
 }
@@ -45,8 +36,8 @@ func NewFileUsageChecker(
 	friendRepo *repository.FriendRepository,
 	momentRepo *repository.MomentRepository,
 	settingRepo *repository.SettingRepository,
+	themeRepo *repository.ThemeRepository,
 	userRepo *repository.UserRepository,
-	menuRepo *repository.MenuRepository,
 	feedbackRepo *repository.FeedbackRepository,
 	commentRepo *repository.CommentRepository,
 ) *FileUsageChecker {
@@ -55,8 +46,8 @@ func NewFileUsageChecker(
 		friendRepo:   friendRepo,
 		momentRepo:   momentRepo,
 		settingRepo:  settingRepo,
+		themeRepo:    themeRepo,
 		userRepo:     userRepo,
-		menuRepo:     menuRepo,
 		feedbackRepo: feedbackRepo,
 		commentRepo:  commentRepo,
 	}
@@ -75,11 +66,8 @@ func (c *FileUsageChecker) IsActuallyUsed(fileURL string) (bool, string, error) 
 		{name: "设置图片", fn: func(url string) (bool, error) {
 			return c.settingRepo.ExistsByValueAndKeys(url, reconciledSettingImageKeys)
 		}},
-		{name: "赞赏图片", fn: func(url string) (bool, error) {
-			return c.settingRepo.ExistsByJSONArrayField(url, jsonArrayImageKeys)
-		}},
+		{name: "主题图片", fn: c.themeRepo.ExistsByImageURL},
 		{name: "用户头像", fn: c.userRepo.ExistsByAvatar},
-		{name: "菜单图标", fn: c.menuRepo.ExistsByIcon},
 		{name: "反馈附件", fn: c.feedbackRepo.ExistsByAttachmentURL},
 		{name: "评论内容", fn: c.commentRepo.ExistsByContentURL},
 	}
@@ -175,6 +163,14 @@ func (s *FileService) MarkAsUnused(fileUrl string) error {
 		return nil
 	}
 	return s.fileRepo.UpdateStatus(fileUrl, 0)
+}
+
+// MarkUnusedByTheme 按主题名标记所有关联文件为未使用
+func (s *FileService) MarkUnusedByTheme(themeName string) error {
+	if themeName == "" {
+		return nil
+	}
+	return s.fileRepo.MarkUnusedByUploadType(themeName)
 }
 
 // ============ 前台服务 ============

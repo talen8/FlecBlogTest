@@ -301,25 +301,22 @@ const isEdit = computed(() => route.name === 'ArticleEdit');
 
 // 系统设置数据
 const basicSettings = ref<Record<string, string>>({});
-const blogSettings = ref<Record<string, string>>({});
 
 // 获取系统设置
 const fetchSiteSettings = async () => {
   try {
-    const [basic, blog] = await Promise.all([getSettingGroup('basic'), getSettingGroup('blog')]);
-    basicSettings.value = basic;
-    blogSettings.value = blog;
+    basicSettings.value = await getSettingGroup('basic');
   } catch (error) {
     console.error('获取系统设置失败:', error);
   }
 };
 
-// 作者名称和头像（从系统设置获取）
+// 作者名称和头像
 const authorInfo = computed(() => {
-  const authorName = basicSettings.value['basic.author'] || '';
+  const authorName = basicSettings.value['author'] || '';
   return {
     name: `@${authorName}`,
-    avatar: basicSettings.value['basic.author_avatar'] || '',
+    avatar: basicSettings.value['author_avatar'] || '',
   };
 });
 

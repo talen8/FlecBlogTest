@@ -1,0 +1,34 @@
+@font-face {
+  font-family: 'LXGW WenKai Lite';
+  src: url('../font/LXGWWenKaiLite-Medium.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family:
+    'LXGW WenKai Lite',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: var(--font-color);
+}
+
+.theme-toggle .theme-icon-moon {
+  opacity: 1;
+}
+
+.theme-toggle .theme-icon-sun {
+  opacity: 0;
+}
+
+html[data-theme='dark'] .theme-toggle .theme-icon-moon {
+  opacity: 0;
+}
+
+html[data-theme='dark'] .theme-toggle .theme-icon-sun {
+  opacity: 1;
+}

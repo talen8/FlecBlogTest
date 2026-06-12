@@ -120,3 +120,17 @@ export function formatMomentTime(date: string | Date | null | undefined): string
   // 其他年份显示年月日
   return target.format('YYYY年M月D日');
 }
+
+/** 计算从指定日期到今天的运行天数 */
+export function calcRunningDays(dateStr: string): number {
+  const startDate = new Date(dateStr).getTime();
+  return Math.floor((Date.now() - startDate) / 86400000);
+}
+
+/** 将秒数格式化为 mm:ss */
+export function formatDuration(seconds: number): string {
+  if (!isFinite(seconds) || isNaN(seconds)) return '00:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}

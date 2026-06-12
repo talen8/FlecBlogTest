@@ -70,3 +70,8 @@ export const deactivateAccount = async (data: DeactivateAccountParams) => {
 export const unbindOAuth = async (provider: string) => {
   await userApi.deleteRequest(`/user/oauth/${provider}`);
 };
+
+/** 轮询微信登录状态 */
+export const pollWechatLoginStatus = async (scene: string) => {
+  return authApi.get<{ status: string; access_token?: string }>(`/wechat/scene/${scene}`);
+};

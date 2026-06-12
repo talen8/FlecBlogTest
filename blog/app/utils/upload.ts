@@ -1,11 +1,5 @@
-import type { ApiResponse } from '@@/types/request';
-
-export type UploadType = '用户头像' | '评论贴图' | '反馈投诉';
-
-export interface UploadResponse {
-  original_name: string;
-  file_url: string;
-}
+import { uploadFileApi } from '@/composables/api/upload';
+import type { UploadResponse } from '@@/types/upload';
 
 export function getMaxFileSizeMB(): number {
   try {
@@ -18,36 +12,9 @@ export function getMaxFileSizeMB(): number {
   }
 }
 
-export function getAllowedFileTypes(type: UploadType): {
-  allowedTypes: string[];
-  typeDescription: string;
-} {
-  if (type === '反馈投诉') {
-    return {
-      allowedTypes: [
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      ],
-      typeDescription: 'JPG、PNG、GIF、WebP 格式的图片或 PDF、DOC、DOCX 格式的文档',
-    };
-  }
-  return {
-    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
-    typeDescription: 'JPG、PNG、GIF、WebP 格式的图片',
-  };
-}
-
-export function validateFile(file: File, type: UploadType): string | null {
-  const { allowedTypes, typeDescription } = getAllowedFileTypes(type);
-
-  if (!allowedTypes.includes(file.type)) {
-    return `只支持 ${typeDescription}`;
+export function validateFile(file: File, allowedTypes?: string[]): string | null {
+  if (allowedTypes && !allowedTypes.includes(file.type)) {
+    return `不支持的文件类型`;
   }
 
   const maxSizeMB = getMaxFileSizeMB();
@@ -59,8 +26,22 @@ export function validateFile(file: File, type: UploadType): string | null {
   return null;
 }
 
-export async function uploadFile(file: File, type: UploadType): Promise<UploadResponse> {
-  const validationError = validateFile(file, type);
+export async function uploadFiles(
+  files: File[],
+  type: string,
+  allowedTypes?: string[]
+): Promise<string[]> {
+  if (files.length === 0) return [];
+  const results = await Promise.all(files.map(file => uploadFile(file, type, allowedTypes)));
+  return results.map(r => r.file_url);
+}
+
+export async function uploadFile(
+  file: File,
+  type: string,
+  allowedTypes?: string[]
+): Promise<UploadResponse> {
+  const validationError = validateFile(file, allowedTypes);
   if (validationError) {
     throw new Error(validationError);
   }
@@ -69,21 +50,8 @@ export async function uploadFile(file: File, type: UploadType): Promise<UploadRe
   formData.append('file', file);
   formData.append('type', type);
 
-  const config = useRuntimeConfig();
-  const baseURL = config.public.apiUrl;
-
-  const response = await $fetch<ApiResponse<UploadResponse>>('/upload', {
-    baseURL,
-    method: 'POST',
-    body: formData,
-  }).catch((error: unknown) => {
+  return uploadFileApi(formData).catch((error: unknown) => {
     const err = error as { data?: { message?: string }; message?: string };
     throw new Error(err?.data?.message || err?.message || '文件上传失败');
   });
-
-  if (response.code !== 0) {
-    throw new Error(response.message || '文件上传失败');
-  }
-
-  return response.data;
 }

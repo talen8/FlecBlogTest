@@ -201,7 +201,7 @@ func (m *Manager) ReloadStorage() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	newStorage, err := NewStorage(&m.config.Upload)
+	newStorage, err := NewStorage(&m.config.Upload, m.config.Server.UploadDir)
 	if err != nil {
 		return err
 	}

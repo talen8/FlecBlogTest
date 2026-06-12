@@ -1,94 +1,72 @@
 <script setup lang="ts">
-import { getMenus } from '@/composables/api/menu';
 import { getCategories } from '@/composables/api/category';
 import { getTags } from '@/composables/api/tag';
 import { getSiteStats } from '@/composables/api/stats';
 import { getSettingGroup } from '@/composables/api/sysconfig';
-
-const { toasts } = useToast();
-const { showLoginModal } = useLoginModal();
-const { showBindEmailModal, triggerGlobal, onBindSuccess } = useBindEmail();
+import { getActiveThemeSchema } from '@/composables/api/theme';
 
 // 全局数据
-const { blogConfig, basicConfig, oauthConfig, uploadConfig } = useSysConfig();
+const { basicConfig, oauthConfig, uploadConfig } = useSysConfig();
 const { menus } = useMenus();
 const { categories, total: categoriesTotal } = useCategories();
 const { tags, total: tagsTotal } = useTags();
 const { siteStats } = useStats();
+const { theme } = useTheme();
 
-// 使用SSR获取全局数据
 const { data: globalData } = await useAsyncData('global-data', async () => {
-  const [
-    basicConfigData,
-    blogConfigData,
-    oauthConfigData,
-    uploadConfigData,
-    menusData,
-    categoriesData,
-    tagsData,
-    statsData,
-  ] = await Promise.all([
-    getSettingGroup('basic'),
-    getSettingGroup('blog'),
-    getSettingGroup('oauth'),
-    getSettingGroup('upload'),
-    getMenus(),
-    getCategories(),
-    getTags(),
-    getSiteStats(),
-  ]);
-
-  // 处理配置数据
-  const processConfig = (config: Record<string, unknown>, prefix: string) => {
-    const processed: Record<string, string> = {};
-    Object.entries(config).forEach(([key, value]) => {
-      if (key.startsWith(`${prefix}.`)) {
-        processed[key.substring(prefix.length + 1)] = value as string;
-      }
-    });
-    return processed;
-  };
+  const [basicData, oauthData, uploadData, categoriesData, tagsData, statsData, themeData] =
+    await Promise.all([
+      getSettingGroup('basic'),
+      getSettingGroup('oauth'),
+      getSettingGroup('upload'),
+      getCategories(),
+      getTags(),
+      getSiteStats(),
+      getActiveThemeSchema(),
+    ]);
 
   return {
-    basicConfig: processConfig(basicConfigData, 'basic'),
-    blogConfig: processConfig(blogConfigData, 'blog'),
-    oauthConfig: processConfig(oauthConfigData, 'oauth'),
-    uploadConfig: processConfig(uploadConfigData, 'upload'),
-    menus: menusData || [],
+    basicConfig: basicData,
+    oauthConfig: oauthData,
+    uploadConfig: uploadData,
+    menus: themeData.menus || {},
     categories: categoriesData.list,
     categoriesTotal: categoriesData.total,
     tags: tagsData.list,
     tagsTotal: tagsData.total,
     stats: statsData,
+    theme: themeData,
   };
 });
 
 // 初始化全局数据
-if (globalData.value) {
-  basicConfig.value = globalData.value.basicConfig;
-  blogConfig.value = globalData.value.blogConfig;
-  oauthConfig.value = globalData.value.oauthConfig;
-  uploadConfig.value = globalData.value.uploadConfig;
-  menus.value = globalData.value.menus;
-  categories.value = globalData.value.categories;
-  tags.value = globalData.value.tags;
-  siteStats.value = globalData.value.stats;
-  if (globalData.value.categoriesTotal !== undefined) {
-    categoriesTotal.value = globalData.value.categoriesTotal;
+watchEffect(() => {
+  if (globalData.value) {
+    basicConfig.value = globalData.value.basicConfig;
+    oauthConfig.value = globalData.value.oauthConfig;
+    uploadConfig.value = globalData.value.uploadConfig;
+    menus.value = globalData.value.menus;
+    categories.value = globalData.value.categories;
+    tags.value = globalData.value.tags;
+    siteStats.value = globalData.value.stats;
+    if (globalData.value.categoriesTotal !== undefined) {
+      categoriesTotal.value = globalData.value.categoriesTotal;
+    }
+    if (globalData.value.tagsTotal !== undefined) {
+      tagsTotal.value = globalData.value.tagsTotal;
+    }
+    if (globalData.value.theme) {
+      theme.value = {
+        slug: globalData.value.theme.slug,
+        name: globalData.value.theme.name || globalData.value.theme.slug,
+        schema: globalData.value.theme.schema,
+        config: globalData.value.theme.config ?? {},
+        loaded: true,
+      };
+    }
+    initMarkdownRenderer();
   }
-  if (globalData.value.tagsTotal !== undefined) {
-    tagsTotal.value = globalData.value.tagsTotal;
-  }
-}
-
-// 全局路由切换时触发邮箱绑定提示
-const router = useRouter();
-router.afterEach(() => {
-  triggerGlobal();
 });
-
-// 背景图片
-const bgImage = computed(() => blogConfig.value.background_image || '/bg.webp');
 
 // 刷新时恢复滚动位置
 onMounted(() => {
@@ -113,31 +91,31 @@ onMounted(() => {
 
 // SEO Meta
 useSeoMeta({
-  description: () => blogConfig.value.description,
-  keywords: () => blogConfig.value.keywords,
+  description: () => basicConfig.value.description,
+  keywords: () => basicConfig.value.keywords,
   author: () => basicConfig.value.author,
   // Open Graph
-  ogTitle: () => blogConfig.value.title,
-  ogDescription: () => blogConfig.value.description,
-  ogImage: () => blogConfig.value.favicon,
+  ogTitle: () => basicConfig.value.title,
+  ogDescription: () => basicConfig.value.description,
+  ogImage: () => basicConfig.value.favicon,
   ogType: 'website',
-  ogSiteName: () => blogConfig.value.title,
+  ogSiteName: () => basicConfig.value.title,
   // Twitter Card
   twitterCard: 'summary_large_image',
-  twitterTitle: () => blogConfig.value.title,
-  twitterDescription: () => blogConfig.value.description,
-  twitterImage: () => blogConfig.value.favicon,
+  twitterTitle: () => basicConfig.value.title,
+  twitterDescription: () => basicConfig.value.description,
+  twitterImage: () => basicConfig.value.favicon,
 });
 
 // 页面标题模板和 favicon
 const route = useRoute();
-const siteTitle = computed(() => blogConfig.value.title);
+const siteTitle = computed(() => basicConfig.value.title);
 
 useHead({
   titleTemplate: (title): string | null => {
     // 首页特殊处理：显示"网站标题 - 网站副标题"
     if (route.path === '/') {
-      const subtitle = blogConfig.value.subtitle;
+      const subtitle = basicConfig.value.subtitle;
       return subtitle ? `${siteTitle.value} - ${subtitle}` : siteTitle.value || null;
     }
 
@@ -147,27 +125,27 @@ useHead({
     return siteTitle.value || null;
   },
   link: [
-    { rel: 'icon', href: blogConfig.value.favicon || '/favicon.ico' },
+    { rel: 'icon', href: basicConfig.value.favicon || '/favicon.ico' },
     // PWA Manifest
     { rel: 'manifest', href: '/manifest.json' },
     // RSS/Atom 订阅
     {
       rel: 'alternate',
       type: 'application/rss+xml',
-      title: `${blogConfig.value.title} - RSS 2.0 Feed`,
+      title: `${basicConfig.value.title} - RSS 2.0 Feed`,
       href: '/rss.xml',
     },
     {
       rel: 'alternate',
       type: 'application/atom+xml',
-      title: `${blogConfig.value.title} - Atom Feed`,
+      title: `${basicConfig.value.title} - Atom Feed`,
       href: '/atom.xml',
     },
   ],
   meta: computed(() => [
-    { name: 'description', content: blogConfig.value.description },
-    { name: 'keywords', content: blogConfig.value.keywords },
-    { name: 'author', content: blogConfig.value.author },
+    { name: 'description', content: basicConfig.value.description },
+    { name: 'keywords', content: basicConfig.value.keywords },
+    { name: 'author', content: basicConfig.value.author },
     // PWA 主题色
     { name: 'theme-color', content: '#f7f7f7' },
     { name: 'mobile-web-app-capable', content: 'yes' },
@@ -179,8 +157,8 @@ useHead({
       innerHTML: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'WebSite',
-        name: blogConfig.value.title,
-        description: blogConfig.value.description,
+        name: basicConfig.value.title,
+        description: basicConfig.value.description,
       }),
     },
   ],
@@ -188,49 +166,7 @@ useHead({
 </script>
 
 <template>
-  <!-- 背景图片 -->
-  <div class="web_bg" :style="{ backgroundImage: `url(${bgImage})` }" />
-
-  <!-- Nuxt 布局和页面系统 -->
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
-
-  <!-- Toast 消息提示 -->
-  <UiToast
-    v-for="toast in toasts"
-    :key="toast.id"
-    :message="toast.message"
-    :type="toast.type"
-    :show="toast.show"
-  />
-
-  <!-- 登录弹窗 -->
-  <FeaturesModalsLoginModal v-model="showLoginModal" />
-
-  <!-- 邮箱绑定弹窗 -->
-  <FeaturesModalsBindEmailModal v-model="showBindEmailModal" @success="onBindSuccess" />
-
-  <!-- 右键菜单 -->
-  <UiContextMenu />
 </template>
-
-<style scoped>
-.web_bg {
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  z-index: -50;
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-}
-
-[data-theme='dark'] .web_bg::before {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background-color: #121212b0;
-  content: '';
-}
-</style>

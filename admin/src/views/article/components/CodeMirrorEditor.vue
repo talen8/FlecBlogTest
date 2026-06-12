@@ -1714,16 +1714,16 @@ const handleOnlineImageDownload = async () => {
 const loadEmojis = async () => {
   if (emojiState.groups.length) return;
 
-  const blogSettings = await getSettingGroup('blog');
+  const settings = await getSettingGroup('basic');
 
   // 更新 Meting-API URL
-  const metingApi = blogSettings['blog.meting_api'] || '';
+  const metingApi = settings['meting_api'] || '';
   if (metingApi) {
     metingApiUrl.value = metingApi;
     setMetingApiUrl(metingApi);
   }
 
-  const emojisUrl = blogSettings['blog.emojis'] || '';
+  const emojisUrl = settings['emojis'] || '';
   if (!emojisUrl) return;
 
   const response = await fetch(emojisUrl);

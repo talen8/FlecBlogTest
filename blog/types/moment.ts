@@ -56,6 +56,25 @@ export interface Moment {
 }
 
 /**
+ * 音乐播放器曲目
+ */
+export interface MusicTrack {
+  name: string;
+  artist: string;
+  url: string;
+  cover: string;
+  lrc?: string;
+}
+
+/**
+ * 歌词行
+ */
+export interface LyricLine {
+  time: number;
+  text: string;
+}
+
+/**
  * 动态列表响应
  */
 export interface MomentListResponse {

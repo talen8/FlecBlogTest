@@ -1,37 +1,28 @@
-import { getSettingGroup } from '~/composables/api/sysconfig';
-
 export default defineEventHandler(async event => {
   try {
-    const [blogConfig] = await Promise.all([getSettingGroup('blog')]);
-
-    const processConfig = (config: Record<string, unknown>, prefix: string) => {
-      const processed: Record<string, string> = {};
-      Object.entries(config).forEach(([key, value]) => {
-        if (key.startsWith(`${prefix}.`)) {
-          processed[key.substring(prefix.length + 1)] = value as string;
-        }
-      });
-      return processed;
-    };
-
-    const blog = processConfig(blogConfig, 'blog');
+    const config = useRuntimeConfig();
+    const apiUrl = (config.public.apiUrl as string).replace(/\/+$/, '');
+    const res = await $fetch<{ code: number; data: Record<string, string> }>(
+      `${apiUrl}/settings/basic`
+    );
+    const cfg = res.code === 0 ? res.data : {};
 
     const manifest = {
-      name: blog.title || 'Flec Blog',
-      short_name: blog.title?.substring(0, 12) || 'Flec',
-      description: blog.description || 'Flec 个人博客',
+      name: cfg.title || 'FlecBlog',
+      short_name: cfg.title?.substring(0, 12) || 'Flec',
+      description: cfg.description || '个人博客',
       theme_color: '#f7f7f7',
       background_color: '#ffffff',
       display: 'standalone',
       start_url: '/',
       icons: [
         {
-          src: blog.favicon || '/favicon.ico',
+          src: cfg.favicon || '/favicon.ico',
           sizes: '192x192',
           type: 'image/png',
         },
         {
-          src: blog.favicon || '/favicon.ico',
+          src: cfg.favicon || '/favicon.ico',
           sizes: '512x512',
           type: 'image/png',
         },
@@ -42,7 +33,7 @@ export default defineEventHandler(async event => {
     return manifest;
   } catch {
     return {
-      name: 'Flec Blog',
+      name: 'FlecBlog',
       short_name: 'Flec',
       theme_color: '#f7f7f7',
       background_color: '#ffffff',

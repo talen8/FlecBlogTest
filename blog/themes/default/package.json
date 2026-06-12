@@ -1,0 +1,11 @@
+{
+  "name": "flec-blog-theme-default",
+  "version": "1.3.0",
+  "private": true,
+  "description": "FlecBlog 官方默认主题",
+  "author": "FlecBlog",
+  "license": "MIT",
+  "dependencies": {
+    "medium-zoom": "^1.1.0"
+  }
+}

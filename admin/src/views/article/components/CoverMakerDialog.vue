@@ -320,8 +320,8 @@ const imageApiUrl = ref('https://pixhub.flec.top');
 // 获取封面制作 API 配置
 const loadCoverMakerConfig = async () => {
   try {
-    const blogSettings = await getSettingGroup('blog');
-    const apiUrl = blogSettings['blog.cover_maker_api'] || '';
+    const settings = await getSettingGroup('basic');
+    const apiUrl = settings['cover_maker_api'] || '';
     if (apiUrl) imageApiUrl.value = apiUrl;
   } catch {
     // 使用默认值

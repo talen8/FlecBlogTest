@@ -53,3 +53,20 @@ export interface CreateCommentParams {
   email?: string;
   website?: string;
 }
+
+/**
+ * 扁平化评论（用于虚拟列表等场景）
+ */
+export interface FlatComment {
+  comment: Comment;
+  depth: number;
+}
+
+/**
+ * 游客信息（本地存储）
+ */
+export interface GuestInfo {
+  nickname: string;
+  email: string;
+  website?: string;
+}

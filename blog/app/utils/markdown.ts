@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import type { TocItem } from '@@/types/markdown';
 import anchor from 'markdown-it-anchor';
 // @ts-expect-error 该第三方库缺少 TypeScript 类型定义文件
 import taskLists from 'markdown-it-task-lists';
@@ -16,8 +17,12 @@ import underline from 'markdown-it-plugin-underline';
 import katex from '@traptitech/markdown-it-katex';
 
 import DOMPurify from 'isomorphic-dompurify';
-import { getEmojiMapSync, replaceEmojisInText } from '@/composables/useEmojis';
-import { useSysConfig } from '@/composables/useStores';
+import {
+  loadEmojiMap,
+  loadAllEmojiGroups,
+  getEmojiMapSync,
+  replaceEmojisInText,
+} from '@/utils/emoji';
 
 // highlight.js 按需加载
 import hljs from 'highlight.js/lib/core';
@@ -659,19 +664,25 @@ function customBlocksPlugin(md: MarkdownIt) {
 // 使用自定义块插件
 md.use(customBlocksPlugin);
 
-// 渲染 Markdown 为 HTML
-export function renderMarkdown(markdown: string): string {
-  if (!markdown) return '';
-
-  // 从系统配置更新 Meting-API URL
+// 初始化渲染器（从系统配置读取 Meting-API 和表情包 URL）
+export function initMarkdownRenderer(): void {
   try {
-    const { blogConfig } = useSysConfig();
-    if (blogConfig.value.meting_api) {
-      metingApiUrl = blogConfig.value.meting_api;
+    const { basicConfig } = useSysConfig();
+    if (basicConfig.value.meting_api) {
+      metingApiUrl = basicConfig.value.meting_api;
+    }
+    if (basicConfig.value.emojis) {
+      loadEmojiMap(basicConfig.value.emojis);
+      loadAllEmojiGroups(basicConfig.value.emojis);
     }
   } catch {
     // useSysConfig 可能在非 Nuxt 上下文中调用，使用默认值
   }
+}
+
+// 渲染 Markdown 为 HTML
+export function renderMarkdown(markdown: string): string {
+  if (!markdown) return '';
 
   const rawHtml = md.render(markdown);
 
@@ -916,14 +927,6 @@ export function estimateReadingTime(markdown: string, wordsPerMinute = 300): num
   return Math.ceil(countWords(markdown) / wordsPerMinute);
 }
 
-// 目录项接口
-export interface TocItem {
-  id: string;
-  level: number;
-  text: string;
-  children?: TocItem[];
-}
-
 // 提取目录
 export function extractToc(markdown: string): TocItem[] {
   if (!markdown) return [];
@@ -1110,13 +1113,6 @@ export function toggleFold(foldId: string): void {
   foldContainer.classList.toggle('open');
 }
 
-function formatTime(seconds: number): string {
-  if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
 export function toggleAudioPlay(audioId: string): void {
   const container = document.querySelector(`[data-audio-id="${audioId}"]`);
   if (!container) return;
@@ -1298,7 +1294,7 @@ function initMusicEvents(container: Element): void {
 
   const updateDuration = () => {
     if (durationTime && audio.duration && isFinite(audio.duration)) {
-      durationTime.textContent = formatTime(audio.duration);
+      durationTime.textContent = formatDuration(audio.duration);
     }
   };
 
@@ -1307,13 +1303,13 @@ function initMusicEvents(container: Element): void {
 
   audio.addEventListener('timeupdate', () => {
     if (currentTimeEl) {
-      currentTimeEl.textContent = formatTime(audio.currentTime);
+      currentTimeEl.textContent = formatDuration(audio.currentTime);
     }
     if (progressBar && audio.duration && isFinite(audio.duration)) {
       progressBar.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
     }
     if (durationTime && audio.duration && isFinite(audio.duration)) {
-      durationTime.textContent = formatTime(audio.duration);
+      durationTime.textContent = formatDuration(audio.duration);
     }
   });
 
@@ -1339,7 +1335,7 @@ function initAudioEvents(container: Element): void {
 
   const updateDuration = () => {
     if (durationTime && audio.duration && isFinite(audio.duration)) {
-      durationTime.textContent = formatTime(audio.duration);
+      durationTime.textContent = formatDuration(audio.duration);
     }
   };
 
@@ -1351,9 +1347,9 @@ function initAudioEvents(container: Element): void {
       progressBar.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
     }
     if (durationTime && audio.duration && isFinite(audio.duration)) {
-      durationTime.textContent = formatTime(audio.duration);
+      durationTime.textContent = formatDuration(audio.duration);
     }
-    if (currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
+    if (currentTimeEl) currentTimeEl.textContent = formatDuration(audio.currentTime);
   });
 
   audio.addEventListener('ended', () => {

@@ -1,3 +1,4 @@
+// 系统静态信息
 export interface SystemStatic {
   cpu_core: number;
   cpu_model: string;
@@ -15,8 +16,10 @@ export interface SystemStatic {
   email_status: string;
   feishu_status: string;
   app_version: string;
+  build_official: boolean;
 }
 
+// 系统动态信息
 export interface SystemDynamic {
   cpu_usage: number;
   load_1: number;
@@ -33,4 +36,29 @@ export interface SystemDynamic {
   db_conn_count: number;
   version_latest_version: string;
   version_last_check_error: string;
+}
+
+// 版本信息
+export interface VersionInfo {
+  id: number;
+  version: string;
+  date: string;
+  changes: string;
+}
+
+// 检查更新响应
+export interface CheckUpdateResponse {
+  has_update: boolean;
+  current_version: string;
+  latest_version: string;
+  versions: VersionInfo[];
+  last_check_error: string;
+}
+
+// 系统升级进度
+export interface UpgradeStatus {
+  target: string;
+  status: string;
+  message: string;
+  progress: number;
 }

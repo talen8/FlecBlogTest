@@ -63,12 +63,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '动态管理', requiresAuth: true },
       },
       {
-        path: 'menus',
-        name: 'Menus',
-        component: () => import('@/views/menu/MenuList.vue'),
-        meta: { title: '菜单管理', requiresAuth: true },
-      },
-      {
         path: 'visits',
         name: 'Visits',
         component: () => import('@/views/visit/VisitList.vue'),
@@ -97,6 +91,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Systems',
         component: () => import('@/views/system/System.vue'),
         meta: { title: '系统信息', requiresAuth: true },
+      },
+      {
+        path: 'themes',
+        name: 'Themes',
+        component: () => import('@/views/theme/ThemeSettings.vue'),
+        meta: { title: '主题管理', requiresAuth: true },
       },
     ],
   },

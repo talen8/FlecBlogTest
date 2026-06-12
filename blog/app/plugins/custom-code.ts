@@ -1,8 +1,3 @@
-/**
- * 自定义代码注入插件
- * 自动将自定义 head 和 body 代码注入到页面中
- */
-
 interface TagData {
   tag: string;
   innerHTML?: string;
@@ -16,15 +11,10 @@ interface HeadPayload {
   style: (Record<string, string> & { innerHTML?: string })[];
 }
 
-interface FontResult {
-  link: { rel: string; href: string }[];
-  style: { innerHTML: string }[];
-}
-
 export default defineNuxtPlugin({
   name: 'custom-code',
   setup() {
-    const { blogConfig } = useSysConfig();
+    const { basicConfig } = useSysConfig();
 
     const parseHtmlTags = (html: string): TagData[] => {
       if (!html) return [];
@@ -74,7 +64,6 @@ export default defineNuxtPlugin({
       tags.forEach(tag => {
         const { tag: tagName, innerHTML, ...attrs } = tag;
 
-        // 过滤掉 undefined 值，转换为 Record<string, string>
         const filteredAttrs = Object.fromEntries(
           Object.entries(attrs).filter(([, v]) => v !== undefined)
         ) as Record<string, string>;
@@ -98,52 +87,21 @@ export default defineNuxtPlugin({
       return headPayload;
     };
 
-    const buildFontLink = (fontConfig: string): FontResult => {
-      if (!fontConfig) return { link: [], style: [] };
-
-      // 从配置中提取 URL 和字体名称
-      const parts = fontConfig.split('|');
-      const url = parts[0]?.trim() || '';
-      const fontFamily = parts[1]?.trim() || '';
-
-      if (!url) return { link: [], style: [] };
-
-      const result: FontResult = {
-        link: [
-          {
-            rel: 'stylesheet',
-            href: url,
-          },
-        ],
-        style: [],
-      };
-
-      // 如果指定了字体名称，添加样式
-      if (fontFamily) {
-        result.style.push({
-          innerHTML: `body { font-family: "${fontFamily}", sans-serif !important; font-weight: normal; }`,
-        });
-      }
-
-      return result;
-    };
-
     useHead(
       computed(() => {
-        const customHead = buildHeadPayload(blogConfig.value.custom_head || '');
-        const fontLink = buildFontLink(blogConfig.value.font || '');
+        const customHead = buildHeadPayload(String(basicConfig.value.custom_head || ''));
 
         return {
           meta: customHead?.meta || [],
-          link: [...(customHead?.link || []), ...fontLink.link],
+          link: customHead?.link || [],
           script: customHead?.script || [],
-          style: [...(customHead?.style || []), ...fontLink.style],
+          style: customHead?.style || [],
         };
       })
     );
 
     const injectBodyCode = () => {
-      const bodyCode = blogConfig.value.custom_body || '';
+      const bodyCode = String(basicConfig.value.custom_body || '');
 
       if (bodyCode && import.meta.client) {
         const oldContainer = document.getElementById('custom-body-inject');
@@ -158,6 +116,6 @@ export default defineNuxtPlugin({
       }
     };
 
-    watch(blogConfig, injectBodyCode, { immediate: true });
+    watch(basicConfig, injectBodyCode, { immediate: true });
   },
 });

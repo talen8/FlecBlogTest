@@ -12,7 +12,7 @@ type File struct {
 	FilePath     string    `json:"file_path" gorm:"type:varchar(500);not null"`
 	FileSize     int64     `json:"file_size"`
 	FileType     string    `json:"file_type" gorm:"type:varchar(100)"`
-	UploadType   string    `json:"upload_type" gorm:"type:varchar(20);index"`
+	UploadType   string    `json:"upload_type" gorm:"type:varchar(100);index"`
 	StorageType  string    `json:"storage_type" gorm:"type:varchar(20);index"`
 	UserID       *uint     `json:"user_id" gorm:"index"`
 	FileURL      string    `json:"file_url" gorm:"type:varchar(500)"`

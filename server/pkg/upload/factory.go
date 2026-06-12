@@ -20,12 +20,12 @@ const (
 )
 
 // NewStorage 根据配置创建存储实例
-func NewStorage(uploadCfg *config.UploadConfig) (storage.Storage, error) {
+func NewStorage(uploadCfg *config.UploadConfig, baseDir string) (storage.Storage, error) {
 	storageType := strings.ToLower(uploadCfg.StorageType)
 
 	switch storageType {
 	case "", StorageTypeLocal: // 空值默认使用本地存储
-		return storage.NewLocalStorage("/app/data/uploads"), nil
+		return storage.NewLocalStorage(baseDir), nil
 
 	case StorageTypeS3:
 		return storage.NewS3UnifiedStorage(*uploadCfg, "s3")
@@ -51,8 +51,8 @@ func NewStorage(uploadCfg *config.UploadConfig) (storage.Storage, error) {
 }
 
 // MustNewStorage 创建存储实例，如果失败则panic（用于启动时初始化）
-func MustNewStorage(uploadCfg *config.UploadConfig) storage.Storage {
-	s, err := NewStorage(uploadCfg)
+func MustNewStorage(uploadCfg *config.UploadConfig, baseDir string) storage.Storage {
+	s, err := NewStorage(uploadCfg, baseDir)
 	if err != nil {
 		panic(fmt.Sprintf("初始化存储失败: %v", err))
 	}
@@ -65,10 +65,10 @@ func MustNewStorage(uploadCfg *config.UploadConfig) storage.Storage {
 
 // InitializeUploadSystem 初始化文件上传系统
 func InitializeUploadSystem(globalCfg *config.Config) *Manager {
-	uploadStorage := MustNewStorage(&globalCfg.Upload)
+	uploadStorage := MustNewStorage(&globalCfg.Upload, globalCfg.Server.UploadDir)
 
 	// 使用与存储路径一致的绝对路径创建目录
-	_ = storage.NewHelper(uploadStorage).CreateUploadDir("/app/data/uploads")
+	_ = storage.NewHelper(uploadStorage).CreateUploadDir(globalCfg.Server.UploadDir)
 
 	return NewManager(uploadStorage, NewValidator(), globalCfg)
 }

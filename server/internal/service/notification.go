@@ -4,15 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
 
 	"flec_blog/internal/dto"
 	"flec_blog/internal/model"
 	"flec_blog/internal/repository"
 	"flec_blog/pkg/logger"
 	notifier "flec_blog/pkg/notification"
+	"flec_blog/pkg/panel"
 	"flec_blog/pkg/utils"
 )
 
@@ -20,13 +18,15 @@ import (
 type NotificationService struct {
 	repo            *repository.NotificationRepository
 	notificationSvc *notifier.Service
+	panel           *panel.Client
 }
 
 // NewNotificationService 创建通知服务实例
-func NewNotificationService(repo *repository.NotificationRepository, notificationSvc *notifier.Service) *NotificationService {
+func NewNotificationService(repo *repository.NotificationRepository, notificationSvc *notifier.Service, panelClient *panel.Client) *NotificationService {
 	return &NotificationService{
 		repo:            repo,
 		notificationSvc: notificationSvc,
+		panel:           panelClient,
 	}
 }
 
@@ -188,7 +188,7 @@ func (s *NotificationService) HasVersionUpdateNotification(ctx context.Context, 
 }
 
 // SyncAnnouncements 同步官方公告
-func (s *NotificationService) SyncAnnouncements(ctx context.Context, announcements []Announcement) error {
+func (s *NotificationService) SyncAnnouncements(ctx context.Context, announcements []panel.Announcement) error {
 	if len(announcements) == 0 {
 		return nil
 	}
@@ -227,41 +227,13 @@ func (s *NotificationService) SyncAnnouncements(ctx context.Context, announcemen
 	return nil
 }
 
-// Announcement 官方公告
-type Announcement struct {
-	ID      int    `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-	Link    string `json:"link"`
-}
-
-const panelURL = "https://panel.flec.top"
-
 // FetchAndSyncAnnouncements 从 Panel 获取公告并同步
 func (s *NotificationService) FetchAndSyncAnnouncements() error {
 	ctx := context.Background()
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(panelURL + "/api/announcements")
+	announcements, err := s.panel.FetchAnnouncements(ctx)
 	if err != nil {
 		return fmt.Errorf("获取公告失败: %w", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("panel 返回错误状态码: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("读取响应失败: %w", err)
-	}
-
-	var announcements []Announcement
-	if err := json.Unmarshal(body, &announcements); err != nil {
-		return fmt.Errorf("解析响应失败: %w", err)
 	}
 
 	return s.SyncAnnouncements(ctx, announcements)

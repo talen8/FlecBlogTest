@@ -20,7 +20,8 @@ type SystemStaticInfo struct {
 	EmailStatus   string `json:"email_status"`
 	FeishuStatus  string `json:"feishu_status"`
 
-	AppVersion string `json:"app_version"`
+	AppVersion    string `json:"app_version"`
+	BuildOfficial bool   `json:"build_official"`
 }
 
 // SystemDynamicInfo 系统动态信息
@@ -58,4 +59,17 @@ type CheckUpdateResponse struct {
 	LatestVersion  string        `json:"latest_version"`
 	Versions       []VersionInfo `json:"versions"`
 	LastCheckError string        `json:"last_check_error"`
+}
+
+// UpgradeRequest 系统升级请求
+type UpgradeRequest struct {
+	Target string `json:"target" binding:"required,oneof=blog server all"` // blog | server | all
+}
+
+// UpgradeStatus 系统升级进度
+type UpgradeStatus struct {
+	Target   string `json:"target"`   // blog | server | idle
+	Status   string `json:"status"`   // idle | downloading | extracting | building | restarting | done | error
+	Message  string `json:"message"`  // 当前步骤描述或错误信息
+	Progress int    `json:"progress"` // 0-100
 }

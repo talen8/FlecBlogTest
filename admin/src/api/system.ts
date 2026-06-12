@@ -1,5 +1,10 @@
 import request from '@/utils/request';
-import type { SystemStatic, SystemDynamic } from '@/types/system';
+import type {
+  SystemStatic,
+  SystemDynamic,
+  CheckUpdateResponse,
+  UpgradeStatus,
+} from '@/types/system';
 
 /**
  * 获取系统静态信息
@@ -18,30 +23,26 @@ export function getSystemDynamic(): Promise<SystemDynamic> {
 }
 
 /**
- * 版本信息
- */
-export interface VersionInfo {
-  id: number;
-  version: string;
-  date: string;
-  changes: string;
-}
-
-/**
- * 检查更新响应
- */
-export interface CheckUpdateResponse {
-  has_update: boolean;
-  current_version: string;
-  latest_version: string;
-  versions: VersionInfo[];
-  last_check_error: string;
-}
-
-/**
  * 检查版本更新
  * @returns Promise<CheckUpdateResponse>
  */
 export function checkUpdate(): Promise<CheckUpdateResponse> {
   return request.post('/admin/system/check-update');
+}
+
+/**
+ * 启动系统升级
+ * @param target 升级目标：blog | server | all
+ * @returns Promise<null>
+ */
+export function startUpgrade(target: 'blog' | 'server' | 'all'): Promise<null> {
+  return request.post('/admin/system/upgrade', { target });
+}
+
+/**
+ * 查询升级进度
+ * @returns Promise<UpgradeStatus>
+ */
+export function getUpgradeStatus(): Promise<UpgradeStatus> {
+  return request.get('/admin/system/upgrade/status');
 }

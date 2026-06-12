@@ -1,0 +1,10 @@
+{
+  "slug": "default",
+  "name": "默认主题",
+  "version": "1.3.0",
+  "author": "FlecBlog",
+  "description": "FlecBlog 官方默认主题",
+  "cover": "",
+  "license": "MIT",
+  "repo": ""
+}

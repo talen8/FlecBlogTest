@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlecBlog 安装向导</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .container { background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.08); padding: 48px; width: 100%; max-width: 640px; margin: 24px; }
+  h1 { font-size: 24px; margin-bottom: 8px; }
+  p.sub { color: #888; font-size: 14px; margin-bottom: 32px; }
+  .form-group { margin-bottom: 20px; }
+  label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; color: #555; }
+  input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; transition: border-color .2s; }
+  input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
+  .row { display: flex; gap: 12px; }
+  .row .form-group { flex: 1; }
+  .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; transition: background .2s; }
+  .btn-primary { background: #4f46e5; color: #fff; }
+  .btn-primary:hover { background: #4338ca; }
+  .btn-primary:disabled { background: #a5b4fc; cursor: not-allowed; }
+  .btn-outline { background: transparent; color: #4f46e5; border: 1px solid #4f46e5; }
+  .btn-outline:hover { background: #f0f0ff; }
+  .btn-back { background: transparent; color: #888; border: 1px solid #ddd; margin-top: 16px; }
+  .btn-back:hover { background: #f5f5f5; }
+  .msg { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; display: none; }
+  .msg-error { display: block; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+  .msg-success { display: block; background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  .msg-info { display: block; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+  .msg-warn { display: block; background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+  .step { display: none; }
+  .step.active { display: block; }
+  .step-indicator { display: flex; justify-content: center; gap: 8px; margin-bottom: 32px; }
+  .step-dot { width: 10px; height: 10px; border-radius: 50%; background: #ddd; }
+  .step-dot.active { background: #4f46e5; }
+  .step-dot.done { background: #16a34a; }
+  .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #ddd; border-top-color: #4f46e5; border-radius: 50%; animation: spin .6s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .choice-cards { display: flex; gap: 16px; margin-top: 24px; }
+  .choice-card { flex: 1; border: 2px solid #eee; border-radius: 12px; padding: 24px; cursor: pointer; transition: all .2s; text-align: center; }
+  .choice-card:hover { border-color: #4f46e5; box-shadow: 0 4px 12px rgba(79,70,229,.12); }
+  .choice-card .icon { font-size: 36px; margin-bottom: 12px; }
+  .choice-card h3 { font-size: 16px; margin-bottom: 8px; }
+  .choice-card p { font-size: 13px; color: #888; line-height: 1.5; }
+
+  .migrate-content { font-size: 14px; line-height: 1.7; color: #444; }
+  .migrate-content h2 { font-size: 18px; margin: 24px 0 8px; }
+  .migrate-content h3 { font-size: 15px; margin: 16px 0 8px; color: #333; }
+  .migrate-content code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .migrate-content pre { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; font-size: 13px; overflow-x: auto; margin: 8px 0; }
+  .migrate-content .warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin: 16px 0; font-size: 13px; }
+  .migrate-content .warn-box strong { color: #d97706; }
+  .migrate-content ol { padding-left: 20px; margin: 8px 0; }
+  .migrate-content li { margin-bottom: 6px; }
+  .reboot-box { text-align: center; padding: 32px 0; }
+  .reboot-box .icon { font-size: 48px; margin-bottom: 16px; }
+  .reboot-box h2 { margin-bottom: 8px; }
+  .reboot-box p { color: #888; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="step-indicator" id="stepIndicator">
+    <span class="step-dot" data-step="0"></span>
+    <span class="step-dot" data-step="1"></span>
+    <span class="step-dot" data-step="2"></span>
+    <span class="step-dot" data-step="3"></span>
+  </div>
+
+  <!-- Step 0: 选择部署方式 -->
+  <div class="step active" id="step0">
+    <h1>欢迎使用 FlecBlog 🎉</h1>
+    <p class="sub">请选择部署方式</p>
+    <div class="choice-cards">
+      <div class="choice-card" onclick="goStep(1)">
+        <div class="icon">🖥️</div>
+        <h3>全新安装</h3>
+        <p>在裸机上首次部署 FlecBlog，配置数据库和 JWT 密钥</p>
+      </div>
+      <div class="choice-card" onclick="showMigrate('docker')">
+        <div class="icon">🐳</div>
+        <h3>从 Docker 迁移</h3>
+        <p>已有 Docker 部署，迁移到原生 PM2 环境</p>
+      </div>
+      <div class="choice-card" onclick="showMigrate('flecb')">
+        <div class="icon">📦</div>
+        <h3>从 flecb 迁移</h3>
+        <p>已有 flecb 安装器部署，迁移到原生 PM2 环境</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 1: 数据库配置 -->
+  <div class="step" id="step1">
+    <h1>数据库配置</h1>
+    <p class="sub">填写你的 PostgreSQL 连接信息</p>
+    <div class="form-group">
+      <label for="dbHost">数据库地址</label>
+      <input id="dbHost" value="localhost" placeholder="localhost">
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label for="dbPort">端口</label>
+        <input id="dbPort" value="5432" placeholder="5432">
+      </div>
+      <div class="form-group">
+        <label for="dbName">数据库名称</label>
+        <input id="dbName" value="flecblog" placeholder="flecblog">
+      </div>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label for="dbUser">数据库用户</label>
+        <input id="dbUser" value="postgres" placeholder="postgres">
+      </div>
+      <div class="form-group">
+        <label for="dbPass">数据库密码</label>
+        <input id="dbPass" type="password" placeholder="输入密码">
+      </div>
+    </div>
+    <div id="msg1" class="msg"></div>
+    <button class="btn btn-primary" id="btnTest" onclick="testConnection()">测试连接</button>
+    <button class="btn btn-back" onclick="goStep(0)">返回</button>
+  </div>
+
+  <!-- Step 2: JWT 密钥 -->
+  <div class="step" id="step2">
+    <h1>JWT 密钥配置</h1>
+    <p class="sub">用于用户认证加密，请妥善保管</p>
+    <div class="form-group">
+      <label for="jwtSecret">JWT 密钥</label>
+      <input id="jwtSecret" placeholder="点击下方按钮自动生成" style="font-family: monospace;">
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:20px;">
+      <button class="btn btn-outline" style="flex:1" onclick="generateJWT()">自动生成</button>
+    </div>
+    <div id="msg2" class="msg"></div>
+    <div style="display:flex;gap:12px;">
+      <button class="btn btn-outline" style="flex:1" onclick="goStep(1)">上一步</button>
+      <button class="btn btn-primary" style="flex:1" id="btnSave" onclick="saveConfig()">保存配置</button>
+    </div>
+  </div>
+
+  <!-- Step 3: 重启 -->
+  <div class="step" id="step3">
+    <div class="reboot-box">
+      <div class="icon">✅</div>
+      <h2>配置已保存</h2>
+      <p>正在重启服务，请稍候...</p>
+      <div style="margin-top:24px;"><span class="loading"></span> 等待服务重启</div>
+    </div>
+    <div id="msg3" class="msg"></div>
+  </div>
+
+  <!-- Step 4: 迁移指引 -->
+  <div class="step" id="step4">
+    <h1>从 <span id="migrateSource">Docker</span> 迁移到原生部署</h1>
+    <div id="msgMigrate" class="msg msg-warn">
+      <strong>⚠️ 迁移有风险</strong><br>
+      操作前建议备份数据。若迁移失败，可通过 Docker 重新启动回滚。
+    </div>
+    <div class="migrate-content" id="migrateContent"></div>
+    <button class="btn btn-back" onclick="goStep(0)">返回上一步</button>
+  </div>
+</div>
+
+<script>
+const API = '/api/v1/setup';
+const migrateDocs = {
+  docker: [
+    { h2: '第一步：确认旧部署路径' },
+    { p: '找到你原先的 docker-compose.yml 所在目录，假设为 <code>/srv/flecblog</code>。以下操作都基于这个路径。' },
+    { h2: '第二步：停掉 Docker 服务' },
+    { pre: 'cd /srv/flecblog\ndocker compose down' },
+    { p: '数据卷不会丢失，放心停。' },
+    { h2: '第三步：复制 .env 和上传文件' },
+    { pre: 'cp /srv/flecblog/.env /opt/flecblog/.env\ncp -r /srv/flecblog/uploads /opt/flecblog/uploads' },
+    { p: '如果 docker-compose.yml 中的 volume 映射用了其他路径，根据实际路径调整。' },
+    { h2: '第四步：修改 DB_HOST' },
+    { p: 'Docker 版 .env 里的 <code>DB_HOST=postgres</code> 在宿主机上无法解析，必须改：' },
+    { pre: "sed -i 's/DB_HOST=postgres/DB_HOST=localhost/' /opt/flecblog/.env" },
+    { p: '如果你的 PG 不在本机，改成实际 IP。' },
+    { h2: '第五步：重启服务' },
+    { pre: 'cd /opt/flecblog\npm2 restart flec-server' },
+    { p: '然后 <strong>刷新本页面</strong>，如果配置正确会自动进入正常模式。' },
+    { h2: '第六步：收尾' },
+    { p: '验证博客正常运行后，可清理旧 Docker 资源：' },
+    { pre: 'docker rm flec_server flec_blog flec_admin flec_postgres 2>/dev/null\ndocker network rm flec-network 2>/dev/null\ndocker volume rm postgres_data 2>/dev/null' },
+    { p: '注意：<code>postgres_data</code> 是数据库数据，确认新服务正常后再删。' },
+  ],
+  flecb: [
+    { h2: '第一步：找到 flecb 安装目录' },
+    { p: 'flecb 安装器的配置保存在 <code>~/.flecblog/config.json</code>，安装目录通常为 <code>/opt/flecblog</code>。' },
+    { h2: '第二步：停掉 Docker 服务' },
+    { pre: 'cd /opt/flecblog\ndocker compose down' },
+    { h2: '第三步：复制 .env 和上传文件' },
+    { pre: 'cp /opt/flecblog/.env /opt/flecblog/.env\ncp -r /opt/flecblog/uploads /opt/flecblog/uploads' },
+    { p: '实际上文件就在原地，无需额外复制。' },
+    { h2: '第四步：修改 DB_HOST' },
+    { pre: "sed -i 's/DB_HOST=postgres/DB_HOST=localhost/' /opt/flecblog/.env" },
+    { h2: '第五步：重启服务' },
+    { pre: 'cd /opt/flecblog\npm2 restart flec-server' },
+    { p: '然后 <strong>刷新本页面</strong>，如果配置正确会自动进入正常模式。' },
+    { h2: '第六步：收尾' },
+    { pre: 'docker rm flec_server flec_blog flec_admin flec_postgres 2>/dev/null\ndocker network rm flec-network 2>/dev/null\nrm -f ~/.flecblog/config.json' },
+  ],
+};
+
+function goStep(n) {
+  document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  document.querySelectorAll('.step-dot').forEach(el => {
+    const s = parseInt(el.dataset.step);
+    el.classList.toggle('active', s === n);
+    el.classList.toggle('done', s < n);
+  });
+}
+
+// 根据 setup_needed 判断是否已配置，已配置则跳过向导
+async function checkStatus() {
+  try {
+    const res = await fetch(API + '/status');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.data && !data.data.setup_needed) {
+        goStep(3);
+      }
+    }
+  } catch(e) {}
+}
+
+function showMigrate(source) {
+  document.getElementById('migrateSource').textContent = source === 'flecb' ? 'flecb' : 'Docker';
+  const steps = migrateDocs[source];
+  const container = document.getElementById('migrateContent');
+  container.innerHTML = '';
+  for (const s of steps) {
+    if (s.h2) {
+      const el = document.createElement('h2');
+      el.textContent = s.h2;
+      container.appendChild(el);
+    } else if (s.p) {
+      const el = document.createElement('p');
+      el.innerHTML = s.p;
+      container.appendChild(el);
+    } else if (s.pre) {
+      const el = document.createElement('pre');
+      el.textContent = s.pre;
+      container.appendChild(el);
+    }
+  }
+  goStep(4);
+}
+
+async function testConnection() {
+  const btn = document.getElementById('btnTest');
+  const msg = document.getElementById('msg1');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> 测试中...';
+  msg.className = 'msg';
+
+  try {
+    const res = await fetch(API + '/database', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        host: document.getElementById('dbHost').value,
+        port: parseInt(document.getElementById('dbPort').value) || 5432,
+        name: document.getElementById('dbName').value,
+        user: document.getElementById('dbUser').value,
+        password: document.getElementById('dbPass').value,
+        jwt_secret: '_test_'
+      })
+    });
+    const data = await res.json();
+    if (data.code === 0) {
+      msg.className = 'msg msg-success';
+      msg.textContent = '数据库连接成功！';
+      goStep(2);
+    } else {
+      msg.className = 'msg msg-error';
+      msg.textContent = data.message || '连接失败';
+    }
+  } catch (e) {
+    msg.className = 'msg msg-error';
+    msg.textContent = '网络错误: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '测试连接';
+  }
+}
+
+function generateJWT() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let s = '';
+  for (let i = 0; i < 48; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
+  document.getElementById('jwtSecret').value = s;
+}
+
+async function saveConfig() {
+  const btn = document.getElementById('btnSave');
+  const msg = document.getElementById('msg2');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> 保存中...';
+  msg.className = 'msg';
+
+  let jwt = document.getElementById('jwtSecret').value;
+  if (!jwt) {
+    generateJWT();
+    jwt = document.getElementById('jwtSecret').value;
+  }
+
+  try {
+    const res = await fetch(API + '/database', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        host: document.getElementById('dbHost').value,
+        port: parseInt(document.getElementById('dbPort').value) || 5432,
+        name: document.getElementById('dbName').value,
+        user: document.getElementById('dbUser').value,
+        password: document.getElementById('dbPass').value,
+        jwt_secret: jwt
+      })
+    });
+    const data = await res.json();
+    if (data.code === 0) {
+      goStep(3);
+      pollServer();
+    } else {
+      msg.className = 'msg msg-error';
+      msg.textContent = data.message || '保存失败';
+      btn.disabled = false;
+      btn.textContent = '保存配置';
+    }
+  } catch (e) {
+    msg.className = 'msg msg-error';
+    msg.textContent = '网络错误: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = '保存配置';
+  }
+}
+
+async function pollServer() {
+  const msg = document.getElementById('msg3');
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await fetch(API + '/status');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data && !data.data.setup_needed) {
+          msg.className = 'msg msg-success';
+          msg.innerHTML = '🎉 服务已重启完成！<br>访问 <a href="/admin/">管理后台</a> 或 <a href="http://localhost:3000">博客首页</a>';
+          return;
+        }
+      }
+    } catch(e) {}
+  }
+  msg.className = 'msg msg-info';
+  msg.innerHTML = '等待超时，请手动刷新页面。';
+}
+
+checkStatus();
+</script>
+</body>
+</html>

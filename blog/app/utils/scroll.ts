@@ -8,7 +8,6 @@ interface ScrollOptions {
  */
 export function scrollToTop(): void {
   if (!import.meta.client) return;
-
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
