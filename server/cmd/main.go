@@ -12,7 +12,6 @@ import (
 
 	"flec_blog/api/middleware"
 	"flec_blog/api/router"
-	v1 "flec_blog/api/v1"
 	"flec_blog/config"
 	"flec_blog/internal/service"
 	"flec_blog/pkg/database"
@@ -49,11 +48,6 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	if cfg.IsSetupNeeded() {
-		startSetupServer(cfg)
-		return
-	}
-
 	// 初始化数据库连接
 	db, err := database.NewDB(&cfg.Database)
 	if err != nil {
@@ -85,10 +79,6 @@ func main() {
 	// 初始化路由
 	r := router.InitRouter(db, cfg)
 
-	// 安装向导轮询端点（正常模式返回 setup_needed: false）
-	setupCtrl := v1.NewSetupController(cfg, ".")
-	r.GET("/api/v1/setup/status", setupCtrl.GetStatus)
-
 	// 注册 Admin 静态文件服务（原生部署，Admin 嵌入二进制）
 	serveAdminStatic(r)
 
@@ -103,42 +93,6 @@ func main() {
 		logger.Warn("Server stopped: %v", err)
 	}
 	utils.CloseIPSearcher()
-}
-
-// startSetupServer 启动首次安装模式（无数据库依赖）
-func startSetupServer(cfg *config.Config) {
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.New()
-	r.Use(middleware.CORS(cfg), middleware.Logger(), middleware.Recovery())
-
-	// 提供嵌入式 setup 页面
-	serveSetupStatic(r)
-
-	// API 路由
-	setupCtrl := v1.NewSetupController(cfg, ".")
-	setupAPI := r.Group("/api/v1/setup")
-	{
-		setupAPI.GET("/status", setupCtrl.GetStatus)
-		setupAPI.POST("/database", setupCtrl.SaveDatabase)
-	}
-
-	addr := fmt.Sprintf("0.0.0.0:%d", cfg.Server.Port)
-	logger.Info("FlecBlog is in setup mode at http://localhost:%d", cfg.Server.Port)
-	logger.Info("Visit http://localhost:%d/setup/ to configure the system", cfg.Server.Port)
-	if err := r.Run(addr); err != nil {
-		log.Fatalf("Failed to start setup server: %v", err)
-	}
-}
-
-// serveSetupStatic 注册 Setup 引导页静态文件服务
-func serveSetupStatic(r *gin.Engine) {
-	subFS, err := fs.Sub(setupFS, "setup")
-	if err != nil {
-		log.Printf("未找到 Setup 嵌入资源: %v", err)
-		return
-	}
-
-	r.StaticFS("/setup", http.FS(subFS))
 }
 
 // serveAdminStatic 注册 Admin 静态文件服务（仅当 adminFS 非空时生效）

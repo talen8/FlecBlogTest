@@ -168,11 +168,6 @@ func LoadConfig() (*Config, error) {
 	return config, nil
 }
 
-// IsSetupNeeded 检查是否需要首次安装配置
-func (c *Config) IsSetupNeeded() bool {
-	return c.Database.Password == "" || c.JWT.Secret == ""
-}
-
 // getEnv 获取环境变量，如果不存在则返回默认值
 func getEnv(key string, defaultVal string) string {
 	if value := os.Getenv(key); value != "" {
