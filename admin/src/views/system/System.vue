@@ -618,8 +618,13 @@ const handleCheckUpdate = async () => {
 };
 
 const handleUpgrade = async () => {
+  if (!latestVersion.value) {
+    ElMessage.error('未找到目标版本信息，请先检查更新');
+    return;
+  }
+
   try {
-    await startUpgrade('all');
+    await startUpgrade(latestVersion.value);
   } catch (err: unknown) {
     ElMessage.error((err as { message?: string })?.message || '启动升级失败');
     return;

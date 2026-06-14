@@ -79,13 +79,26 @@ func (h *SystemController) Upgrade(c *gin.Context) {
 		return
 	}
 
+	// 校验版本有效性
 	status := h.systemService.GetVersionStatus()
 	if len(status.LatestVersions) == 0 {
-		response.Failed(c, "请先检查更新，获取目标版本信息")
+		response.Failed(c, "未找到可用版本，请先检查更新")
 		return
 	}
 
-	if err := service.StartUpgrade(req.Target, status.LatestVersions[0].Version); err != nil {
+	valid := false
+	for _, v := range status.LatestVersions {
+		if v.Version == req.Version {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		response.Failed(c, "版本号无效或已过期，请重新检查更新")
+		return
+	}
+
+	if err := service.StartUpgrade(req.Version); err != nil {
 		response.Failed(c, err.Error())
 		return
 	}

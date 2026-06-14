@@ -63,7 +63,7 @@ type CheckUpdateResponse struct {
 
 // UpgradeRequest 系统升级请求
 type UpgradeRequest struct {
-	Target string `json:"target" binding:"required,oneof=blog server all"` // blog | server | all
+	Version string `json:"version" binding:"required"`
 }
 
 // UpgradeStatus 系统升级进度

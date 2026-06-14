@@ -32,11 +32,11 @@ export function checkUpdate(): Promise<CheckUpdateResponse> {
 
 /**
  * 启动系统升级
- * @param target 升级目标：blog | server | all
+ * @param version 目标版本号
  * @returns Promise<null>
  */
-export function startUpgrade(target: 'blog' | 'server' | 'all'): Promise<null> {
-  return request.post('/admin/system/upgrade', { target });
+export function startUpgrade(version: string): Promise<null> {
+  return request.post('/admin/system/upgrade', { version });
 }
 
 /**

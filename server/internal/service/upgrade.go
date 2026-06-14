@@ -50,7 +50,7 @@ func InitUpgrade() {
 	tmpDir := os.TempDir()
 	entries, _ := os.ReadDir(tmpDir)
 	for _, e := range entries {
-		if e.IsDir() && strings.HasPrefix(e.Name(), "flec-") && strings.Contains(e.Name(), "-upgrade-") {
+		if e.IsDir() && strings.HasPrefix(e.Name(), "flec") && strings.Contains(e.Name(), "-upgrade-") {
 			_ = os.RemoveAll(filepath.Join(tmpDir, e.Name()))
 		}
 	}
@@ -75,7 +75,7 @@ func setUpgradeStatus(target, status, message string, progress int) {
 }
 
 // StartUpgrade 启动异步升级
-func StartUpgrade(target, version string) error {
+func StartUpgrade(version string) error {
 	flecDir := os.Getenv("FLECBLOG_DIR")
 	if flecDir == "" {
 		return fmt.Errorf("FLECBLOG_DIR 未配置，仅支持原生部署模式升级")
@@ -97,19 +97,7 @@ func StartUpgrade(target, version string) error {
 			upgradeMu.Unlock()
 		}()
 
-		switch target {
-		case "blog":
-			doUpgradeBlog(flecDir, version)
-		case "server":
-			doUpgradeServer(flecDir, version)
-		case "all":
-			doUpgradeBlog(flecDir, version)
-			s := GetUpgradeStatus()
-			if s.Status == "error" {
-				return
-			}
-			doUpgradeServer(flecDir, version)
-		}
+		doUpgradeAll(flecDir, version)
 
 		if upgradeNeedExit {
 			upgradeWg.Wait()
@@ -121,22 +109,60 @@ func StartUpgrade(target, version string) error {
 	return nil
 }
 
-// ==================== Blog 升级 ====================
+// ==================== 升级流程 ====================
 
-func doUpgradeBlog(flecDir, version string) {
-	blogDir := filepath.Join(flecDir, "blog")
+func doUpgradeAll(flecDir, version string) {
+	// 1. 下载整合包
+	arch := "amd64"
+	if runtime.GOARCH == "arm64" {
+		arch = "arm64"
+	}
 
-	setUpgradeStatus("blog", "downloading", fmt.Sprintf("正在下载 Blog %s...", version), 10)
-
-	tarURL := fmt.Sprintf("/%s/releases/download/%s/flec-blog.tar.gz", githubRepo, version)
+	setUpgradeStatus("all", "downloading", fmt.Sprintf("正在下载更新包 %s (%s)...", version, arch), 5)
+	tarURL := fmt.Sprintf("/%s/releases/download/%s/flecblog_linux_%s.tar.gz", githubRepo, version, arch)
 	tarPath, err := downloadRelease(tarURL)
 	if err != nil {
-		setUpgradeStatus("blog", "error", "下载失败: "+err.Error(), 0)
+		setUpgradeStatus("all", "error", "下载失败: "+err.Error(), 0)
 		return
 	}
 	defer func() { _ = os.Remove(tarPath) }()
 
-	setUpgradeStatus("blog", "extracting", "正在备份用户主题...", 30)
+	// 2. 解压整合包
+	setUpgradeStatus("all", "extracting", "正在解压更新包...", 10)
+	tmpDir, err := os.MkdirTemp("", "flecblog-upgrade-*")
+	if err != nil {
+		setUpgradeStatus("all", "error", "创建临时目录失败: "+err.Error(), 0)
+		return
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	if err := extractTarGz(tarPath, tmpDir, ""); err != nil {
+		setUpgradeStatus("all", "error", "解压失败: "+err.Error(), 0)
+		return
+	}
+
+	// 3. 升级 Blog
+	upgradeBlogFromPackage(flecDir, tmpDir, version)
+	s := GetUpgradeStatus()
+	if s.Status == "error" {
+		return
+	}
+
+	// 4. 升级 Server
+	upgradeServerFromPackage(tmpDir, version)
+}
+
+func upgradeBlogFromPackage(flecDir, packageDir, version string) {
+	blogDir := filepath.Join(flecDir, "blog")
+
+	// 定位 blog/ 目录
+	blogSrcDir := findFile(packageDir, "blog")
+	if blogSrcDir == "" {
+		setUpgradeStatus("blog", "error", "整合包中未找到 blog 目录", 0)
+		return
+	}
+
+	setUpgradeStatus("blog", "extracting", "正在备份用户主题...", 20)
 	themesSrc := filepath.Join(blogDir, "themes")
 	tmpThemes, err := os.MkdirTemp("", "flec-themes-backup-*")
 	if err != nil {
@@ -150,34 +176,8 @@ func doUpgradeBlog(flecDir, version string) {
 		return
 	}
 
-	setUpgradeStatus("blog", "extracting", "正在解压更新文件...", 40)
-	tmpExtract, err := os.MkdirTemp("", "flec-blog-upgrade-*")
-	if err != nil {
-		setUpgradeStatus("blog", "error", "创建临时目录失败: "+err.Error(), 0)
-		return
-	}
-	defer func() { _ = os.RemoveAll(tmpExtract) }()
-
-	if err := extractTarGz(tarPath, tmpExtract, ""); err != nil {
-		setUpgradeStatus("blog", "error", "解压失败: "+err.Error(), 0)
-		return
-	}
-
-	srcDir := tmpExtract
-	if _, err := os.Stat(filepath.Join(tmpExtract, "package.json")); err != nil {
-		entries, _ := os.ReadDir(tmpExtract)
-		for _, e := range entries {
-			if e.IsDir() {
-				if _, err := os.Stat(filepath.Join(tmpExtract, e.Name(), "package.json")); err == nil {
-					srcDir = filepath.Join(tmpExtract, e.Name())
-					break
-				}
-			}
-		}
-	}
-
 	setUpgradeStatus("blog", "extracting", "正在更新系统文件...", 50)
-	if err := copyDir(srcDir, blogDir, []string{"themes"}); err != nil {
+	if err := copyDir(blogSrcDir, blogDir, []string{"themes"}); err != nil {
 		setUpgradeStatus("blog", "error", "更新文件失败: "+err.Error(), 0)
 		return
 	}
@@ -214,45 +214,17 @@ func doUpgradeBlog(flecDir, version string) {
 		return
 	}
 
-	setUpgradeStatus("blog", "done", fmt.Sprintf("Blog 已升级至 %s", version), 100)
+	setUpgradeStatus("blog", "done", fmt.Sprintf("Blog 已升级至 %s", version), 50)
 }
 
-// ==================== Server 升级 ====================
-
-func doUpgradeServer(_, version string) {
-	arch := "amd64"
-	if runtime.GOARCH == "arm64" {
-		arch = "arm64"
-	}
-
-	setUpgradeStatus("server", "downloading", fmt.Sprintf("正在下载 Server %s (%s)...", version, arch), 10)
-	tarURL := fmt.Sprintf("/%s/releases/download/%s/flec-server_linux_%s.tar.gz", githubRepo, version, arch)
-	tarPath, err := downloadRelease(tarURL)
-	if err != nil {
-		setUpgradeStatus("server", "error", "下载失败: "+err.Error(), 0)
-		return
-	}
-	defer func() { _ = os.Remove(tarPath) }()
-
-	setUpgradeStatus("server", "extracting", "正在解压...", 40)
-	tmpDir, err := os.MkdirTemp("", "flec-server-upgrade-*")
-	if err != nil {
-		setUpgradeStatus("server", "error", "创建临时目录失败: "+err.Error(), 0)
-		return
-	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	if err := extractTarGz(tarPath, tmpDir, ""); err != nil {
-		setUpgradeStatus("server", "error", "解压失败: "+err.Error(), 0)
-		return
-	}
-
+func upgradeServerFromPackage(packageDir, version string) {
 	binaryName := "flec-server"
 	if runtime.GOOS == "windows" {
 		binaryName += ".exe"
 	}
 
-	newBinary := findFile(tmpDir, binaryName)
+	setUpgradeStatus("server", "extracting", "正在定位 Server 二进制...", 60)
+	newBinary := findFile(packageDir, binaryName)
 	if newBinary == "" {
 		setUpgradeStatus("server", "error", "二进制文件不存在", 0)
 		return
@@ -468,7 +440,7 @@ func findFile(root, name string) string {
 		if err != nil {
 			return nil //nolint:nilerr // 查找文件时跳过错误条目
 		}
-		if !info.IsDir() && info.Name() == name {
+		if info.Name() == name {
 			result = path
 			return filepath.SkipDir
 		}

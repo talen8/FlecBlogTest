@@ -103,7 +103,7 @@ jobs:
           go-version: "1.25"
           cache-dependency-path: server/go.sum
 
-      - name: 交叉编译原生部署二进制
+      - name: 构建 FlecBlog 整合包
         working-directory: server
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
@@ -114,26 +114,30 @@ jobs:
             mkdir -p ${pkg_dir}
             cp -r templates ${pkg_dir}/
             cp .env.example ${pkg_dir}/.env.example
-            echo "请将 .env.example 复制为 .env 并配置相关参数" > ${pkg_dir}/README.txt
+
+            # 打包完整的 Blog 源码
+            cp -r ../blog ${pkg_dir}/blog
+            rm -rf ${pkg_dir}/blog/node_modules ${pkg_dir}/blog/.nuxt ${pkg_dir}/blog/.output
+            rm -f ${pkg_dir}/blog/.env
           }
 
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags embed_admin -ldflags="-s -w -X 'flec_blog/internal/service.AppVersion=${VERSION}' -X 'flec_blog/pkg/panel.PanelAPIKey=${{ secrets.PANEL_API_KEY }}'" -o flec-server ./cmd/
-          prepare_package "dist/flec-server_linux_amd64"
-          mv flec-server dist/flec-server_linux_amd64/flec-server
-          tar -czf dist/flec-server_linux_amd64.tar.gz -C dist flec-server_linux_amd64
-          rm -rf dist/flec-server_linux_amd64
+          prepare_package "dist/flecblog_linux_amd64"
+          mv flec-server dist/flecblog_linux_amd64/flec-server
+          tar -czf dist/flecblog_linux_amd64.tar.gz -C dist flecblog_linux_amd64
+          rm -rf dist/flecblog_linux_amd64
 
           GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags embed_admin -ldflags="-s -w -X 'flec_blog/internal/service.AppVersion=${VERSION}' -X 'flec_blog/pkg/panel.PanelAPIKey=${{ secrets.PANEL_API_KEY }}'" -o flec-server ./cmd/
-          prepare_package "dist/flec-server_linux_arm64"
-          mv flec-server dist/flec-server_linux_arm64/flec-server
-          tar -czf dist/flec-server_linux_arm64.tar.gz -C dist flec-server_linux_arm64
-          rm -rf dist/flec-server_linux_arm64
+          prepare_package "dist/flecblog_linux_arm64"
+          mv flec-server dist/flecblog_linux_arm64/flec-server
+          tar -czf dist/flecblog_linux_arm64.tar.gz -C dist flecblog_linux_arm64
+          rm -rf dist/flecblog_linux_arm64
 
-      - name: 上传原生部署构建产物
+      - name: 上传整合包构建产物
         uses: actions/upload-artifact@v7
         with:
           name: native-dist
-          path: server/dist/flec-server_*.tar.gz
+          path: server/dist/flecblog_*.tar.gz
           retention-days: 1
 
   release:
@@ -147,17 +151,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 打包 Blog 源码
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          tar -czhf flec-blog.tar.gz \
-            --exclude='node_modules' \
-            --exclude='.nuxt' \
-            --exclude='.output' \
-            --exclude='.env' \
-            blog/
-
-      - name: 下载原生部署构建产物
+      - name: 下载整合包构建产物
         uses: actions/download-artifact@v8
         with:
           name: native-dist
@@ -213,5 +207,4 @@ jobs:
           prerelease: ${{ steps.changelog.outputs.is_prerelease == 'true' }}
           generate_release_notes: false
           files: |
-            flec-blog.tar.gz
             native/dist/*.tar.gz
